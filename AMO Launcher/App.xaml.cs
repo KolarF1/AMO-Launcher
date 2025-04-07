@@ -1,0 +1,180 @@
+﻿using AMO_Launcher.Services;
+using System;
+using System.IO;
+using System.Windows;
+
+namespace AMO_Launcher
+{
+    public partial class App : Application
+    {
+        // Services that will be accessible throughout the application
+        public static GameDetectionService GameDetectionService { get; private set; } = null!;
+        public static ConfigurationService ConfigService { get; private set; } = null!;
+        public static IconCacheService IconCacheService { get; private set; } = null!;
+        public static ManualGameIconService ManualGameIconService { get; private set; } = null!;
+        public static ModDetectionService ModDetectionService { get; private set; } = null!;
+        public static GameBackupService GameBackupService { get; private set; } = null!;
+        public static ProfileService ProfileService { get; private set; } = null!; // New service
+
+        // Log file for debugging
+        private static string LogFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+            "AMO_Launcher_Debug.log");
+
+        public App()
+        {
+            // Hook up the unhandled exception handler
+            this.DispatcherUnhandledException += Application_DispatcherUnhandledException;
+
+            // Start with a clean log
+            if (File.Exists(LogFilePath))
+            {
+                try { File.Delete(LogFilePath); } catch { }
+            }
+
+            LogToFile("Application starting");
+        }
+
+        protected override void OnStartup(StartupEventArgs e)
+        {
+            try
+            {
+                base.OnStartup(e);
+                LogToFile("OnStartup called");
+
+                // Initialize application services
+                InitializeServices();
+                LogToFile("Services initialized");
+
+                // Create and show the main window
+                LogToFile("Creating MainWindow");
+                var mainWindow = new MainWindow();
+                LogToFile("Showing MainWindow");
+                mainWindow.Show();
+                LogToFile("MainWindow shown");
+            }
+            catch (Exception ex)
+            {
+                LogToFile($"FATAL ERROR in OnStartup: {ex}");
+                MessageBox.Show($"Fatal error during startup: {ex.Message}\n\nSee log file on desktop for details.",
+                    "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void InitializeServices()
+        {
+            try
+            {
+                LogToFile("Initializing ConfigService");
+                // Initialize the configuration service first
+                ConfigService = new ConfigurationService();
+
+                LogToFile("Initializing IconCacheService");
+                // Initialize the icon cache service
+                IconCacheService = new IconCacheService();
+
+                LogToFile("Initializing ManualGameIconService");
+                // Initialize the manual game icon service
+                ManualGameIconService = new ManualGameIconService();
+
+                LogToFile("Initializing GameDetectionService");
+                // Initialize the game detection service
+                GameDetectionService = new GameDetectionService();
+
+                LogToFile("Initializing ModDetectionService");
+                // Initialize the mod detection service
+                ModDetectionService = new ModDetectionService();
+
+                LogToFile("Initializing GameBackupService");
+                // Initialize the game backup service
+                GameBackupService = new GameBackupService();
+
+                LogToFile("Initializing ProfileService");
+                // Initialize the profile service (after ConfigService)
+                ProfileService = new ProfileService(ConfigService);
+
+                // Log successful initialization
+                LogToFile("All services initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                LogToFile($"ERROR in InitializeServices: {ex}");
+
+                // Handle any initialization errors
+                MessageBox.Show($"Error initializing services: {ex.Message}\n\nThe application may not function correctly.\n\nSee log file on desktop for details.",
+                    "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                // Initialize with fallback empty services if needed
+                if (ConfigService == null)
+                {
+                    LogToFile("Creating fallback ConfigService");
+                    ConfigService = new ConfigurationService();
+                }
+
+                if (IconCacheService == null)
+                {
+                    LogToFile("Creating fallback IconCacheService");
+                    IconCacheService = new IconCacheService();
+                }
+
+                if (ManualGameIconService == null)
+                {
+                    LogToFile("Creating fallback ManualGameIconService");
+                    ManualGameIconService = new ManualGameIconService();
+                }
+
+                if (GameDetectionService == null)
+                {
+                    LogToFile("Creating fallback GameDetectionService");
+                    GameDetectionService = new GameDetectionService();
+                }
+
+                if (ModDetectionService == null)
+                {
+                    LogToFile("Creating fallback ModDetectionService");
+                    ModDetectionService = new ModDetectionService();
+                }
+
+                if (GameBackupService == null)
+                {
+                    LogToFile("Creating fallback GameBackupService");
+                    GameBackupService = new GameBackupService();
+                }
+
+                if (ProfileService == null)
+                {
+                    LogToFile("Creating fallback ProfileService");
+                    ProfileService = new ProfileService(ConfigService);
+                }
+            }
+        }
+
+        // Log to a file on the desktop for debugging
+        public static void LogToFile(string message)
+        {
+            try
+            {
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                string logMessage = $"[{timestamp}] {message}";
+                File.AppendAllText(LogFilePath, logMessage + Environment.NewLine);
+            }
+            catch
+            {
+                // Ignore logging errors
+            }
+        }
+
+        // Handle unhandled exceptions to prevent crashes
+        private void Application_DispatcherUnhandledException(object sender,
+            System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            LogToFile($"UNHANDLED EXCEPTION: {e.Exception}");
+
+            MessageBox.Show($"An unhandled exception occurred: {e.Exception.Message}\n\nPlease restart the application.\n\nSee log file on desktop for details.",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+
+            // Mark as handled to prevent application crash
+            e.Handled = true;
+        }
+    }
+}

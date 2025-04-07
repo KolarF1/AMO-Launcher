@@ -1,0 +1,1086 @@
+﻿<Window
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls" 
+        xmlns:local="clr-namespace:AMO_Launcher"
+        xmlns:models="clr-namespace:AMO_Launcher.Models"
+        x:Class="AMO_Launcher.MainWindow"
+        xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+        mc:Ignorable="d"
+        Title="AMO Launcher" Height="650" Width="1000"
+        WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded"
+        WindowStyle="None" 
+        ResizeMode="CanResize"
+        AllowsTransparency="True"
+        BorderThickness="0">
+
+    <Window.Resources>
+
+        <Style x:Key="HeaderStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        </Style>
+
+        <!-- Window Button Style -->
+        <Style x:Key="WindowButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="border" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1AFFFFFF" TargetName="border"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#3DFFFFFF" TargetName="border"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CloseButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource WindowButtonStyle}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E81123"/>
+                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type Button}">
+                                <Border x:Name="border" Background="{TemplateBinding Background}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter Property="Background" Value="#F1707A" TargetName="border"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ChangeGameButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="#00000000"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="BorderBrush" Value="{x:Null}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Width" Value="120"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="border" 
+                                Background="#00000000"
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter x:Name="contentPresenter" 
+                                              HorizontalAlignment="Center" 
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#19000000" TargetName="border"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect ShadowDepth="0" BlurRadius="10" Color="Gold" Opacity="0.6"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="RenderTransform" TargetName="contentPresenter">
+                                    <Setter.Value>
+                                        <TranslateTransform Y="1"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Column Header Style -->
+        <Style x:Key="ColumnHeaderStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Margin" Value="10,10,0,10"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+
+        <!-- Tab Header Text Style -->
+        <Style x:Key="TabHeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="White" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TabItem}, Path=IsSelected}" Value="True">
+                    <Setter Property="Foreground" Value="Black" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- New Button Styles for the requested buttons -->
+        <Style x:Key="LaunchGameButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <Style x:Key="RefreshModsButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+
+        <Style x:Key="ModActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Width" Value="25.96"/>
+            <Setter Property="Height" Value="25.96"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Padding" Value="4"/>
+        </Style>
+
+        <Style x:Key="ProfileDropdownStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="8,4,8,4"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="border" 
+                            Background="{TemplateBinding Background}" 
+                            BorderBrush="{TemplateBinding BorderBrush}" 
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- FIXED: Explicitly set Foreground to ensure text visibility -->
+                                    <TextBlock Grid.Column="0"
+                                             x:Name="ContentSite" 
+                                             Text="{Binding SelectedItem.Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                             TextTrimming="CharacterEllipsis"
+                                             VerticalAlignment="Center" 
+                                             Margin="6,0,6,0"
+                                             MinWidth="50"
+                                             TextAlignment="Left"
+                                             Foreground="Black"/>
+
+                                    <!-- Dropdown Arrow -->
+                                    <iconPacks:PackIconBootstrapIcons Grid.Column="1" 
+                                                             Kind="ChevronDown" 
+                                                             Width="12" Height="12" 
+                                                             VerticalAlignment="Center"
+                                                             Foreground="Black"
+                                                             Margin="8,0,8,0"/>
+
+                                    <!-- Transparent ToggleButton for capturing clicks -->
+                                    <ToggleButton Grid.ColumnSpan="2" 
+                                         x:Name="ToggleButton"
+                                         Focusable="false"
+                                         IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                         Background="Transparent"
+                                         BorderThickness="0">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                </Grid>
+                            </Border>
+
+                            <!-- Popup for dropdown items -->
+                            <Popup x:Name="Popup" 
+                          IsOpen="{TemplateBinding IsDropDownOpen}" 
+                          Placement="Bottom"
+                          Focusable="False" 
+                          AllowsTransparency="True" 
+                          PopupAnimation="Slide">
+                                <Border x:Name="PopupBorder" 
+                               Background="#222222" 
+                               BorderBrush="#444444" 
+                               BorderThickness="1"
+                               CornerRadius="0,0,3,3"
+                               Width="{TemplateBinding ActualWidth}"
+                               MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <ScrollViewer SnapsToDevicePixels="True" 
+                                        x:Name="ScrollViewer" 
+                                        Margin="0,4,0,4" 
+                                        BorderThickness="0"
+                                        HorizontalScrollBarVisibility="Disabled">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect ShadowDepth="0" BlurRadius="5" Color="Gold" Opacity="0.6"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+
+            <!-- Item Container Style (for ComboBoxItems) -->
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="OverridesDefaultStyle" Value="True"/>
+                        <Setter Property="SnapsToDevicePixels" Value="True"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="MinHeight" Value="25"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="Bd"
+                                           Background="Transparent"
+                                           BorderThickness="0"
+                                           Padding="8,6"
+                                           Margin="2,0,2,0">
+                                        <TextBlock x:Name="Tb" 
+                                                  Text="{TemplateBinding Content}" 
+                                                  TextTrimming="CharacterEllipsis"
+                                                  Margin="4,0,4,0"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                        </Trigger>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ProfileActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Width" Value="25.96"/>
+            <Setter Property="Height" Value="25.96"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Padding" Value="1"/>
+        </Style>
+
+        <Style x:Key="ApplyModButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+    </Window.Resources>
+
+    <Window.Background>
+        <StaticResource ResourceKey="GeometricBackground"/>
+    </Window.Background>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="50"/>
+        </Grid.RowDefinitions>
+
+        <!-- Custom Title Bar -->
+        <Grid Grid.Row="0" Background="{DynamicResource AMOGoldGradientHorizontal}" Height="40" 
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- App Icon and Title -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,0,0">
+                <Image Source="pack://application:,,,/Icon.ico" Width="40" Height="40" 
+                       VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+            </StackPanel>
+
+            <TextBlock Text="AMO Launcher" FontSize="16" Style="{StaticResource HeaderStyle}" 
+                      FontWeight="Bold" Margin="130,3,513,16" Grid.Column="1" Foreground="Black"/>
+            <TextBlock Text="Selected Game: " Foreground="Black" FontSize="12" Grid.Column="1" Margin="130,20,547,4"/>
+            <TextBlock x:Name="CurrentGameTextBlock" Text="No game selected" FontSize="12" FontWeight="SemiBold" Grid.Column="1" Margin="214,20,387,4" Foreground="Black"/>
+
+            <!-- Window Controls -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="MinimizeButton" Content="&#xE921;" Style="{StaticResource WindowButtonStyle}" 
+                        Click="MinimizeButton_Click" ToolTip="Minimize" Height="40"/>
+                <Button x:Name="MaximizeButton" Content="&#xE922;" Style="{StaticResource WindowButtonStyle}" 
+                        Click="MaximizeButton_Click" ToolTip="Maximize" Height="40"/>
+                <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource CloseButtonStyle}" 
+                        Click="CloseButton_Click" ToolTip="Close" Height="40"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Header with Game Selection -->
+        <Grid Grid.Row="1" Background="{StaticResource SecondaryBrush}" Margin="0,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+        </Grid>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="2" Margin="10,10,10,-9">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Mod Management Content (dual column layout) -->
+            <Border x:Name="GameContentPanel" Grid.Row="0" Grid.RowSpan="2"
+                   Background="{StaticResource SecondaryBrush}" BorderBrush="#333333" 
+                   BorderThickness="1" Padding="0" Margin="0,0,0,10" Visibility="Visible">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <!-- Left column - Available Mods -->
+                        <ColumnDefinition Width="*"/>
+                        <!-- Column separator -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- Right column - Applied Mods and Conflicts -->
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left Column - Available Mods -->
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Left Column Header -->
+                        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Height="30">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Available Mods" 
+                                          Style="{StaticResource ColumnHeaderStyle}" 
+                                          Margin="10,0,0,0" 
+                                          HorizontalAlignment="Left" 
+                                          VerticalAlignment="Center" 
+                                          FontWeight="Normal"/>
+
+                                <!-- Refresh Mods Button (positioned at right edge) -->
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource RefreshModsButtonStyle}" 
+                                        Width="26" Height="26" 
+                                        Margin="0,0,2,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        ToolTip="Refresh Mods" 
+                                        Padding="4"
+                                        Click="RefreshModsButton_Click">
+                                    <iconPacks:PackIconBootstrapIcons Kind="ArrowClockwise" 
+                                                                     Width="16" 
+                                                                     Height="16" 
+                                                                     HorizontalAlignment="Center" 
+                                                                     VerticalAlignment="Center"/>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <!-- Available Mods Content -->
+                        <Border Grid.Row="1" BorderBrush="#333333" BorderThickness="0,1,0,0">
+                            <Grid Margin="10">
+
+                                <!-- ListView that will display available mods -->
+                                <TreeView x:Name="AvailableModsTreeView" 
+                                 Background="Transparent" 
+                                 BorderThickness="0"
+                                 Visibility="Visible">
+                                    <TreeView.Resources>
+                                        <!-- Template for category headers -->
+                                        <HierarchicalDataTemplate DataType="{x:Type models:ModCategory}" 
+                                          ItemsSource="{Binding Mods}">
+                                            <TextBlock Text="{Binding Name}" 
+                                               FontWeight="Bold" 
+                                               Foreground="{StaticResource TextBrush}"
+                                               Margin="0,5,0,5"/>
+                                        </HierarchicalDataTemplate>
+
+                                        <!-- Template for mod items -->
+                                        <DataTemplate DataType="{x:Type models:ModInfo}">
+                                            <Grid Margin="5,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Mod Icon -->
+                                                <Border Width="32" Height="32" 
+                                                        Background="{StaticResource PrimaryBrush}"
+                                                        BorderBrush="#333333" BorderThickness="1" 
+                                                        CornerRadius="2" Margin="2">
+                                                    <Image Source="{Binding Icon}" Width="24" Height="24"
+                                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                                           RenderOptions.EdgeMode="Aliased"/>
+                                                </Border>
+
+                                                <!-- Mod Name and Author -->
+                                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                    <TextBlock Text="{Binding Name}" 
+                                                               FontWeight="SemiBold" 
+                                                               Foreground="{StaticResource TextBrush}"/>
+                                                    <TextBlock Text="{Binding AuthorDisplay}" 
+                                                               FontSize="11" 
+                                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                </StackPanel>
+
+                                                <!-- Version -->
+                                                <TextBlock Grid.Column="2" 
+                                                           Text="{Binding Version}" 
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           Margin="10,0,0,0"/>
+                                            </Grid>
+                                        </DataTemplate>
+
+                                        <!-- IMPORTANT: Move the TreeViewItemToggleButton template BEFORE the TreeViewItem style that uses it -->
+                                        <!-- Template for the TreeView expander button -->
+                                        <ControlTemplate x:Key="TreeViewItemToggleButton" TargetType="{x:Type ToggleButton}">
+                                            <Border Width="19" Height="19" Background="Transparent">
+                                                <Path x:Name="ExpandPath" 
+                                                      Stroke="{StaticResource TextBrush}" 
+                                                      StrokeThickness="1.5"
+                                                      Data="M 4,0 L 8,4 L 4,8 Z" 
+                                                      HorizontalAlignment="Center" 
+                                                      VerticalAlignment="Center" 
+                                                      RenderTransformOrigin="0.5,0.5">
+                                                    <Path.RenderTransform>
+                                                        <RotateTransform x:Name="ExpandPathRotateTransform"/>
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                            </Border>
+
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter Property="RenderTransform" TargetName="ExpandPath">
+                                                        <Setter.Value>
+                                                            <RotateTransform Angle="90"/>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Stroke" TargetName="ExpandPath" Value="{StaticResource AccentBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+
+                                        <!-- Style for TreeViewItems (both categories and mods) -->
+                                        <Style TargetType="{x:Type TreeViewItem}">
+                                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                            <Setter Property="Padding" Value="8,0"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type TreeViewItem}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+
+                                                            <!-- Header row with expand/collapse button -->
+                                                            <Border x:Name="Bd" Grid.Row="0" 
+                                                                    Background="{TemplateBinding Background}"
+                                                                    BorderThickness="0" 
+                                                                    Padding="{TemplateBinding Padding}">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto" MinWidth="19"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
+
+                                                                    <!-- ExpanderButton -->
+                                                                    <ToggleButton x:Name="Expander" 
+                                                                                  IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" 
+                                                                                  ClickMode="Press"
+                                                                                  Template="{StaticResource TreeViewItemToggleButton}"/>
+
+                                                                    <!-- Header content -->
+                                                                    <ContentPresenter x:Name="PART_Header" 
+                                                                                      Grid.Column="1"
+                                                                                      ContentSource="Header"
+                                                                                      HorizontalAlignment="Left" 
+                                                                                      VerticalAlignment="Center"/>
+                                                                </Grid>
+                                                            </Border>
+
+                                                            <!-- ItemsPresenter (child items container) -->
+                                                            <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Margin="20,0,0,0"/>
+                                                        </Grid>
+
+                                                        <!-- Visual states and triggers -->
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsExpanded" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" TargetName="ItemsHost"/>
+                                                            </Trigger>
+                                                            <Trigger Property="HasItems" Value="False">
+                                                                <Setter Property="Visibility" Value="Hidden" TargetName="Expander"/>
+                                                            </Trigger>
+                                                            <Trigger Property="IsSelected" Value="True">
+                                                                <Setter Property="Background" Value="#33FD9A69" TargetName="Bd"/>
+                                                            </Trigger>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#1AFD9A69" TargetName="Bd"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </TreeView.Resources>
+                                </TreeView>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Column Separator -->
+                    <GridSplitter Grid.Column="1" 
+                                 Width="5" 
+                                 HorizontalAlignment="Center" 
+                                 VerticalAlignment="Stretch" 
+                                 Background="#333333"/>
+
+                    <!-- Right Column - Applied Mods & Conflicts -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <!-- For tab headers and buttons -->
+                            <RowDefinition Height="*"/>
+                            <!-- For tab content -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Header row containing both tabs and buttons -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- For tabs -->
+                                <ColumnDefinition Width="*"/>
+                                <!-- Spacer -->
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- For buttons -->
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Tab Headers Only -->
+                            <TabControl x:Name="ModTabControl" Grid.Row="0" Grid.RowSpan="2" 
+                                       Background="Transparent" 
+                                       BorderThickness="0" Padding="-2,2,-8,2"
+                                       Grid.ColumnSpan="3"
+                                       SelectionChanged="TabControl_SelectionChanged">
+                                <TabControl.Resources>
+                                    <!-- Style for the tab items -->
+                                    <Style TargetType="TabItem">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="TabItem">
+                                                    <Border x:Name="Border" 
+                                                           Padding="10,5" 
+                                                           BorderThickness="0" 
+                                                           Background="{StaticResource PrimaryBrush}">
+                                                        <ContentPresenter x:Name="ContentSite" 
+                                                     ContentSource="Header"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="Border" 
+                                                                   Property="Background" 
+                                                                   Value="{StaticResource AMOGoldGradient}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </TabControl.Resources>
+
+                                <!-- Applied Mods Tab -->
+                                <TabItem x:Name="AppliedModsTab" IsSelected="True">
+                                    <TabItem.Header>
+                                        <TextBlock Text="Applied Mods" 
+                                                Style="{StaticResource TabHeaderTextStyle}" FontWeight="DemiBold"/>
+                                    </TabItem.Header>
+                                    <Grid>
+                                        <Border BorderBrush="#333333" BorderThickness="0,1,0,0">
+                                            <Grid Margin="10">
+                                                <TextBlock Text="Mods at bottom have highest priority." 
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           FontStyle="Italic"
+                                                           Margin="0,-13,306,43" FontSize="10.5" HorizontalAlignment="Left"/>
+                                                <!-- ListView for Applied Mods -->
+                                                <ListView x:Name="AppliedModsListView" 
+                                                         Background="Transparent" 
+                                                         BorderThickness="0"
+                                                         Visibility="Collapsed"
+                                                         AlternationCount="1000">
+                                                    <ListView.ContextMenu>
+                                                        <ContextMenu Style="{StaticResource ModContextMenuStyle}">
+                                                            <MenuItem Header="Delete Mod" 
+                                                                      Style="{StaticResource ModContextMenuItemStyle}"
+                                                                      Click="DeleteMod_Click">
+                                                                <MenuItem.Icon>
+                                                                    <iconPacks:PackIconBootstrapIcons Kind="Trash" Width="16" Height="16" Foreground="#E57B6F"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="Deactivate All Mods" 
+                                                                      Style="{StaticResource ModContextMenuItemStyle}"
+                                                                      Click="DeactivateAllMods_Click">
+                                                                <MenuItem.Icon>
+                                                                    <iconPacks:PackIconBootstrapIcons Kind="ToggleOff" Width="16" Height="16" Foreground="#FF1E9525"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                        </ContextMenu>
+                                                    </ListView.ContextMenu>
+                                                    <ListView.View>
+                                                        <GridView>
+                                                            <!-- Hide column headers -->
+                                                            <GridView.ColumnHeaderContainerStyle>
+                                                                <Style TargetType="{x:Type GridViewColumnHeader}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </Style>
+                                                            </GridView.ColumnHeaderContainerStyle>
+
+                                                            <!-- Active Checkbox -->
+                                                            <GridViewColumn Width="50">
+                                                                <GridViewColumn.CellTemplate>
+                                                                    <DataTemplate>
+                                                                        <CheckBox IsChecked="{Binding IsActive, Mode=TwoWay}" 
+                                                                                 VerticalAlignment="Center"
+                                                                                 HorizontalAlignment="Center"
+                                                                                 Checked="ActiveCheckBox_CheckChanged"
+                                                                                 Unchecked="ActiveCheckBox_CheckChanged"/>
+                                                                    </DataTemplate>
+                                                                </GridViewColumn.CellTemplate>
+                                                            </GridViewColumn>
+
+                                                            <!-- Mod Name with Icon -->
+                                                            <GridViewColumn Width="350">
+                                                                <GridViewColumn.CellTemplate>
+                                                                    <DataTemplate>
+                                                                        <Grid>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="Auto"/>
+                                                                                <ColumnDefinition Width="*"/>
+                                                                            </Grid.ColumnDefinitions>
+
+                                                                            <!-- Mod Icon -->
+                                                                            <Border Width="32" Height="32" 
+                                                                                  Background="{StaticResource PrimaryBrush}"
+                                                                                  BorderBrush="#333333" BorderThickness="1" 
+                                                                                  CornerRadius="2" Margin="2">
+                                                                                <Image Source="{Binding Icon}" Width="24" Height="24"
+                                                                                     RenderOptions.BitmapScalingMode="HighQuality"
+                                                                                     RenderOptions.EdgeMode="Aliased"/>
+                                                                            </Border>
+
+                                                                            <!-- Mod Name and Author -->
+                                                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                                                <TextBlock Text="{Binding Name}" 
+                                                                                         FontWeight="SemiBold" 
+                                                                                         Foreground="{StaticResource TextBrush}"/>
+                                                                                <TextBlock Text="{Binding AuthorDisplay}" 
+                                                                                         FontSize="11" 
+                                                                                         Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                                            </StackPanel>
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </GridViewColumn.CellTemplate>
+                                                            </GridViewColumn>
+
+                                                            <!-- Priority Number (now on the right) -->
+                                                            <GridViewColumn Width="50">
+                                                                <GridViewColumn.CellTemplate>
+                                                                    <DataTemplate>
+                                                                        <Border Background="{StaticResource AMOGoldGradient}" 
+                                                                               Width="24" Height="24" 
+                                                                               CornerRadius="4"
+                                                                               HorizontalAlignment="Center"
+                                                                               VerticalAlignment="Center">
+                                                                            <TextBlock Text="{Binding PriorityDisplay}" 
+                                                                                     FontWeight="Bold" 
+                                                                                     Foreground="Black"
+                                                                                     HorizontalAlignment="Center"
+                                                                                     VerticalAlignment="Center" FontSize="14"/>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </GridViewColumn.CellTemplate>
+                                                            </GridViewColumn>
+                                                        </GridView>
+                                                    </ListView.View>
+                                                </ListView>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </TabItem>
+
+                                <!-- Conflicts Tab -->
+                                <TabItem Height="25.96" x:Name="ConflictsTab">
+                                    <TabItem.Header>
+                                        <!-- Keep the original styling exactly as it was -->
+                                        <TextBlock Text="Conflicts" 
+                 Style="{StaticResource TabHeaderTextStyle}" FontWeight="DemiBold"/>
+                                    </TabItem.Header>
+                                    <Grid>
+                                        <Border BorderBrush="#333333" BorderThickness="0,1,0,0">
+                                            <Grid Margin="10">
+                                                <!-- ListView for conflicts with proper visibility -->
+                                                <ListView x:Name="ConflictsListView" 
+                         Background="Transparent" 
+                         BorderThickness="0"
+                         SelectionMode="Extended"
+                         Visibility="Visible">
+                                                    <ListView.View>
+                                                        <GridView>
+                                                            <!-- Hide column headers -->
+                                                            <GridView.ColumnHeaderContainerStyle>
+                                                                <Style TargetType="{x:Type GridViewColumnHeader}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </Style>
+                                                            </GridView.ColumnHeaderContainerStyle>
+
+                                                            <!-- Mod info column -->
+                                                            <GridViewColumn Width="200">
+                                                                <GridViewColumn.CellTemplate>
+                                                                    <DataTemplate>
+                                                                        <Grid Background="{Binding RowBackground}">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="Auto"/>
+                                                                                <ColumnDefinition Width="*"/>
+                                                                            </Grid.ColumnDefinitions>
+
+                                                                            <!-- Mod Icon -->
+                                                                            <Border Width="32" Height="32" 
+                                                    Background="{StaticResource PrimaryBrush}"
+                                                    BorderBrush="#333333" BorderThickness="1" 
+                                                    CornerRadius="2" Margin="2">
+                                                                                <Image Source="{Binding ModIcon}" Width="24" Height="24"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                                       RenderOptions.EdgeMode="Aliased"/>
+                                                                            </Border>
+
+                                                                            <!-- Mod Name -->
+                                                                            <TextBlock Grid.Column="1" Text="{Binding ModName}" 
+                                                       FontWeight="SemiBold" 
+                                                       Foreground="{StaticResource TextBrush}"
+                                                       Margin="8,0,0,0"
+                                                       VerticalAlignment="Center"/>
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </GridViewColumn.CellTemplate>
+                                                            </GridViewColumn>
+
+                                                            <!-- File Path column -->
+                                                            <GridViewColumn Width="300">
+                                                                <GridViewColumn.CellTemplate>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding FilePath}" 
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                                                    </DataTemplate>
+                                                                </GridViewColumn.CellTemplate>
+                                                            </GridViewColumn>
+                                                        </GridView>
+                                                    </ListView.View>
+                                                </ListView>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </TabItem>
+
+                                <TabItem Height="25.96" x:Name="DescriptionTab" Visibility="Collapsed">
+                                    <TabItem.Header>
+                                        <TextBlock Text="Description" 
+                                                Style="{StaticResource TabHeaderTextStyle}" FontWeight="DemiBold"/>
+                                    </TabItem.Header>
+                                    <Grid>
+                                        <Border BorderBrush="#333333" BorderThickness="0,1,0,0">
+                                            <Grid Margin="10">
+                                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                                    <StackPanel>
+                                                        <!-- Mod Image/Logo Banner -->
+                                                        <Border Width="Auto" Height="100" 
+                                                                Background="{StaticResource PrimaryBrush}" 
+                                                                BorderBrush="#333333" BorderThickness="1" 
+                                                                Margin="0,0,0,10">
+                                                            <Grid>
+                                                                <Image x:Name="ModHeaderImage" Source="{Binding SelectedItem.Icon, ElementName=AvailableModsTreeView}" 
+                                                                       Width="64" Height="64" 
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"
+                                                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                                                       Stretch="Uniform"/>
+                                                            </Grid>
+                                                        </Border>
+
+                                                        <!-- Mod Details -->
+                                                        <StackPanel Margin="0,0,0,10">
+                                                            <TextBlock x:Name="ModNameTextBlock" 
+                                                                       Text="{Binding SelectedItem.Name, ElementName=AvailableModsTreeView}" 
+                                                                       FontWeight="Bold" FontSize="18" 
+                                                                       Foreground="{StaticResource TextBrush}" 
+                                                                       Margin="0,0,0,5"/>
+
+                                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                                                <TextBlock Text="by " 
+                                                                           Foreground="{StaticResource TextSecondaryBrush}" 
+                                                                           FontSize="12"/>
+                                                                <TextBlock x:Name="ModAuthorTextBlock" 
+                                                                           Text="{Binding SelectedItem.Author, ElementName=AvailableModsTreeView}" 
+                                                                           Foreground="{StaticResource TextBrush}" 
+                                                                           FontSize="12"/>
+                                                            </StackPanel>
+
+                                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                                                <TextBlock Text="Version: " 
+                                                                           Foreground="{StaticResource TextSecondaryBrush}" 
+                                                                           FontSize="12"/>
+                                                                <TextBlock x:Name="ModVersionTextBlock" 
+                                                                           Text="{Binding SelectedItem.Version, ElementName=AvailableModsTreeView}" 
+                                                                           Foreground="{StaticResource TextBrush}" 
+                                                                           FontSize="12"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+
+                                                        <TextBlock Text="Description:" 
+                                                                   Foreground="{StaticResource TextSecondaryBrush}" 
+                                                                   FontSize="14" FontWeight="SemiBold" 
+                                                                   Margin="0,0,0,5"/>
+
+                                                        <TextBlock x:Name="ModDescriptionTextBlock" 
+                                                                   Text="{Binding SelectedItem.Description, ElementName=AvailableModsTreeView}" 
+                                                                   Foreground="{StaticResource TextBrush}" 
+                                                                   TextWrapping="Wrap" 
+                                                                   Margin="0,0,0,20"/>
+
+                                                        <TextBlock Text="Installation Path:" 
+                                                                   Foreground="{StaticResource TextSecondaryBrush}" 
+                                                                   FontSize="14" FontWeight="SemiBold" 
+                                                                   Margin="0,0,0,5"/>
+
+                                                        <TextBlock x:Name="ModPathTextBlock" 
+                                                                   Text="{Binding SelectedItem.ModFolderPath, ElementName=AvailableModsTreeView}" 
+                                                                   Foreground="{StaticResource TextBrush}" 
+                                                                   TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </ScrollViewer>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </TabItem>
+                            </TabControl>
+
+                            <!-- Buttons above the tab content but separated from the TabControl -->
+                            <StackPanel x:Name="ModActionButtons" 
+                                      Grid.Column="2"
+                                      Orientation="Horizontal" 
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Top"
+                                      Visibility="Visible">
+                                <Button Style="{StaticResource ModActionButtonStyle}" ToolTip="Remove" Click="ModActionButton_Click" Tag="Remove">
+                                    <iconPacks:PackIconBootstrapIcons Kind="Trash" Width="16" Height="16"/>
+                                </Button>
+                                <Button Style="{StaticResource ModActionButtonStyle}" ToolTip="Move To Bottom" Click="ModActionButton_Click" Tag="MoveBottom">
+                                    <iconPacks:PackIconBootstrapIcons Kind="ChevronBarDown" Width="16" Height="16"/>
+                                </Button>
+                                <Button Style="{StaticResource ModActionButtonStyle}" ToolTip="Move Down" Click="ModActionButton_Click" Tag="MoveDown">
+                                    <iconPacks:PackIconBootstrapIcons Kind="ChevronDown" Width="16" Height="16"/>
+                                </Button>
+                                <Button Style="{StaticResource ModActionButtonStyle}" ToolTip="Move Up" Click="ModActionButton_Click" Tag="MoveUp">
+                                    <iconPacks:PackIconBootstrapIcons Kind="ChevronUp" Width="16" Height="16"/>
+                                </Button>
+                                <Button Style="{StaticResource ModActionButtonStyle}" ToolTip="Move To Top" Click="ModActionButton_Click" Tag="MoveTop">
+                                    <iconPacks:PackIconBootstrapIcons Kind="ChevronBarUp" Width="16" Height="16"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Button x:Name="SettingsButton" 
+                    Style="{StaticResource WindowButtonStyle}" 
+                    Margin="0,-50,128,0"
+                    Click="SettingsButton_Click" 
+                    Height="40"
+                    Padding="8,8,8,8" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Right" VerticalAlignment="Top" Width="46">
+                <Button.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform ScaleX="-1"/>
+                        <SkewTransform/>
+                        <RotateTransform/>
+                        <TranslateTransform/>
+                    </TransformGroup>
+                </Button.RenderTransform>
+                <StackPanel VerticalAlignment="Center" 
+                HorizontalAlignment="Center" 
+                Orientation="Horizontal">
+                    <iconPacks:PackIconBootstrapIcons Kind="Gear" 
+                                         Width="24" 
+                                         Height="24"
+                                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <Button x:Name="ChangeGameButton"
+                    Style="{StaticResource ChangeGameButtonStyle}" 
+                    Margin="30,-50,830,68"
+                    Click="ChangeGameButton_Click" 
+                    Height="40"
+                    Padding="6,11">
+                <StackPanel VerticalAlignment="Center" 
+                            HorizontalAlignment="Center" 
+                            Orientation="Horizontal">
+                    <iconPacks:PackIconBootstrapIcons Kind="Controller" 
+                                                     Width="24" 
+                                                     Height="24"
+                                                     VerticalAlignment="Center" 
+                                                     Margin="0,0,6,0"/>
+                    <TextBlock Text="Change Game" 
+                              VerticalAlignment="Center" 
+                              FontWeight="Medium"/>
+                </StackPanel>
+            </Button>
+            <Rectangle 
+            Width="1" 
+            Height="18" 
+            Fill="Black" 
+            HorizontalAlignment="Left" 
+            VerticalAlignment="Top" 
+            Margin="151,-39,0,0">
+                <Rectangle.Effect>
+                    <DropShadowEffect ShadowDepth="1" BlurRadius="3" Color="Gold" Opacity="0.3"/>
+                </Rectangle.Effect>
+            </Rectangle>
+        </Grid>
+
+        <!-- Button Panel -->
+        <Border Grid.Row="3" Background="{StaticResource PrimaryBrush}" BorderThickness="1,0,1,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="275*"/>
+                    <ColumnDefinition Width="376*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Pink: Mod Profile Dropdown with fixed width and long name test item -->
+                <ComboBox x:Name="ProfileComboBox" Grid.Column="0" Style="{StaticResource ProfileDropdownStyle}" 
+          Height="25.96" Margin="9,11,0,11" VerticalContentAlignment="Center" Width="128"/>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,7,155,7" Grid.ColumnSpan="2">
+                    <Button x:Name="NewProfileButton" Style="{StaticResource ProfileActionButtonStyle}" 
+        ToolTip="New Profile">
+                        <iconPacks:PackIconBootstrapIcons Kind="FileEarmarkPlus" Width="22" Height="22"/>
+                    </Button>
+
+                    <Button x:Name="DeleteProfileButton" Style="{StaticResource ProfileActionButtonStyle}" 
+        ToolTip="Delete Profile">
+                        <iconPacks:PackIconBootstrapIcons Kind="FileEarmarkMinus" Width="22" Height="22"/>
+                    </Button>
+
+                    <Button x:Name="ExportProfileButton" Style="{StaticResource ProfileActionButtonStyle}" 
+        ToolTip="Export Profile">
+                        <iconPacks:PackIconBootstrapIcons Kind="FileEarmarkArrowUp" Width="22" Height="22"/>
+                    </Button>
+
+                    <Button x:Name="ImportProfileButton" Style="{StaticResource ProfileActionButtonStyle}" 
+        ToolTip="Import Profile">
+                        <iconPacks:PackIconBootstrapIcons Kind="FileEarmarkArrowDown" Width="22" Height="22"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Orange: Apply Mods Button -->
+                <Button Grid.Column="2" Style="{StaticResource ApplyModButtonStyle}" 
+                        HorizontalAlignment="Left"
+                        Margin="232,13,0,11" Padding="11,5,11,5" 
+                        Width="128" Grid.ColumnSpan="2"
+                        Click="ApplyModsButton_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Apply Mod(s)" VerticalAlignment="Center" FontWeight="Medium" Margin="0,-2,0,0"/>
+                        <iconPacks:PackIconBootstrapIcons Kind="BoxArrowInRight" 
+                                                         Width="16" Height="16"
+                                                         Margin="4,1,0,0" 
+                                                         VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <!-- Red: Launch Game Button -->
+                <Button Grid.Column="4" Style="{StaticResource LaunchGameButtonStyle}" 
+                        Margin="4,12,10,11" Padding="11,3,11,4" 
+                        HorizontalContentAlignment="Center"
+                        Width="128" Height="25.96"
+                        Click="LaunchGameButton_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconBootstrapIcons Kind="PlayFill" 
+                                                         Width="16" Height="16" 
+                                                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="0,2,4,0"/>
+                        <TextBlock Text="Launch Game" FontWeight="Medium"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Resize Grip for Custom Resize -->
+        <ResizeGrip x:Name="WindowResizeGrip" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
+                    Opacity="0.8" Grid.Row="3"/>
+    </Grid>
+</Window>
