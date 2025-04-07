@@ -45,7 +45,10 @@ namespace AMO_Launcher.Services
                 DefaultGameId = null,
                 LastGameId = null,
                 AppliedMods = new Dictionary<string, List<AppliedModSetting>>(),
-                LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>()
+                LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>(),
+                // Use case-insensitive dictionary to prevent key mismatches
+                GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase),
+                ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             };
         }
 
@@ -59,7 +62,7 @@ namespace AMO_Launcher.Services
                     string json = await File.ReadAllTextAsync(_configFilePath);
                     var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
 
-                    // Ensure the RemovedGamePaths list exists (for backward compatibility)
+                    // Ensure the RemovedGamePaths list exists
                     if (loadedSettings.RemovedGamePaths == null)
                     {
                         loadedSettings.RemovedGamePaths = new List<string>();
@@ -77,9 +80,41 @@ namespace AMO_Launcher.Services
                         loadedSettings.LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>();
                     }
 
+                    // Ensure the GameProfiles dictionary exists and is case-insensitive
+                    if (loadedSettings.GameProfiles == null)
+                    {
+                        loadedSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
+                    }
+                    else if (!(loadedSettings.GameProfiles is Dictionary<string, List<ModProfile>>))
+                    {
+                        // Copy to a case-insensitive dictionary if it's not already one
+                        var newDict = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var entry in loadedSettings.GameProfiles)
+                        {
+                            newDict[entry.Key] = entry.Value;
+                        }
+                        loadedSettings.GameProfiles = newDict;
+                    }
+
+                    // Ensure the ActiveProfileIds dictionary exists and is case-insensitive
+                    if (loadedSettings.ActiveProfileIds == null)
+                    {
+                        loadedSettings.ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    }
+                    else if (!(loadedSettings.ActiveProfileIds is Dictionary<string, string>))
+                    {
+                        // Copy to a case-insensitive dictionary if it's not already one
+                        var newDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var entry in loadedSettings.ActiveProfileIds)
+                        {
+                            newDict[entry.Key] = entry.Value;
+                        }
+                        loadedSettings.ActiveProfileIds = newDict;
+                    }
+
                     _currentSettings = loadedSettings;
 
-                    // Load icons from disk for all games (especially manually added ones)
+                    // Load icons from disk for all games
                     foreach (var game in _currentSettings.Games)
                     {
                         if (game.IsManuallyAdded && !string.IsNullOrEmpty(game.ExecutablePath))
@@ -93,7 +128,7 @@ namespace AMO_Launcher.Services
                                 }
                                 catch (Exception ex)
                                 {
-                                    System.Diagnostics.Debug.WriteLine($"Error loading icon for {game.ExecutablePath}: {ex.Message}");
+                                    App.LogToFile($"Error loading icon for {game.ExecutablePath}: {ex.Message}");
                                 }
                             }
                         }
@@ -105,7 +140,11 @@ namespace AMO_Launcher.Services
             catch (Exception ex)
             {
                 // Log the error but continue with default settings
-                Console.WriteLine($"Error loading settings: {ex.Message}");
+                App.LogToFile($"Error loading settings: {ex.Message}");
+                App.LogToFile($"Stack trace: {ex.StackTrace}");
+
+                // Try to load from backup if main file failed
+                return await TryLoadFromBackupAsync();
             }
 
             return _currentSettings;
@@ -494,10 +533,20 @@ namespace AMO_Launcher.Services
 
                 // Ensure the game profiles dictionary exists
                 if (_currentSettings.GameProfiles == null)
-                    _currentSettings.GameProfiles = new Dictionary<string, List<ModProfile>>();
+                    _currentSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
+
+                // Create a backup of the profiles before saving
+                BackupSettingsFile();
+
+                // Filter out any null profiles
+                var validProfiles = profiles.Where(p => p != null).ToList();
+                if (validProfiles.Count < profiles.Count)
+                {
+                    App.LogToFile($"Filtered out {profiles.Count - validProfiles.Count} null profiles");
+                }
 
                 // Save the profiles
-                _currentSettings.GameProfiles[gameId] = profiles;
+                _currentSettings.GameProfiles[gameId] = validProfiles;
 
                 // Save settings to disk
                 await SaveSettingsAsync();
@@ -656,22 +705,18 @@ namespace AMO_Launcher.Services
                 // Log the exact game ID we're looking for
                 App.LogToFile($"GetProfiles: Looking for profiles with game ID: {gameId}");
 
-                // Also log all available game IDs in GameProfiles
-                if (_currentSettings?.GameProfiles != null)
+                // Ensure dictionaries are initialized
+                if (_currentSettings.GameProfiles == null)
                 {
-                    foreach (var key in _currentSettings.GameProfiles.Keys)
-                    {
-                        App.LogToFile($"Available profile game ID: {key}");
-                    }
-                }
-                else
-                {
-                    App.LogToFile("GameProfiles dictionary is null or empty");
+                    _currentSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
+                    App.LogToFile("Created new GameProfiles dictionary");
                 }
 
-                // Return empty list if no profiles exist
-                if (_currentSettings?.GameProfiles == null)
-                    return new List<ModProfile>();
+                // Log all available game IDs in GameProfiles for debugging
+                foreach (var key in _currentSettings.GameProfiles.Keys)
+                {
+                    App.LogToFile($"Available profile game ID: {key}");
+                }
 
                 // Check if there are profiles for this exact game ID
                 if (_currentSettings.GameProfiles.TryGetValue(gameId, out var exactProfiles))
@@ -681,28 +726,101 @@ namespace AMO_Launcher.Services
                 }
 
                 // If not found with the exact ID, try to match by game name portion
-                // This handles cases where the ID format changed but the name part is consistent
                 string gameName = gameId.Split('_')[0]; // Extract name part before underscore
 
                 foreach (var entry in _currentSettings.GameProfiles)
                 {
                     // Check if the key starts with the game name
-                    if (entry.Key.StartsWith(gameName + "_") || entry.Key == gameName)
+                    if (entry.Key.StartsWith(gameName + "_", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(entry.Key, gameName, StringComparison.OrdinalIgnoreCase))
                     {
                         App.LogToFile($"Found profiles using partial name match: {entry.Key}");
+
+                        // Save with new ID to prevent future mismatches
+                        _currentSettings.GameProfiles[gameId] = entry.Value;
+                        Task.Run(() => SaveSettingsAsync());
+
                         return entry.Value;
                     }
                 }
 
-                // No profiles found
-                App.LogToFile("No profiles found for this game");
-                return new List<ModProfile>();
+                // No profiles found - create a default one
+                var defaultProfile = new ModProfile();
+                var newList = new List<ModProfile> { defaultProfile };
+                _currentSettings.GameProfiles[gameId] = newList;
+                Task.Run(() => SaveSettingsAsync());
+
+                App.LogToFile($"No profiles found for this game, created default profile");
+                return newList;
             }
             catch (Exception ex)
             {
                 App.LogToFile($"Error in GetProfiles: {ex.Message}");
-                return new List<ModProfile>();
+                App.LogToFile($"Stack trace: {ex.StackTrace}");
+                // Return a new default profile in case of error
+                return new List<ModProfile> { new ModProfile() };
             }
+        }
+
+        private void BackupSettingsFile()
+        {
+            try
+            {
+                if (!File.Exists(_configFilePath))
+                    return;
+
+                string backupPath = _configFilePath + ".bak";
+                File.Copy(_configFilePath, backupPath, true);
+                App.LogToFile($"Settings file backed up to {backupPath}");
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error backing up settings file: {ex.Message}");
+            }
+        }
+
+        private async Task<AppSettings> TryLoadFromBackupAsync()
+        {
+            try
+            {
+                string backupPath = _configFilePath + ".bak";
+                if (File.Exists(backupPath))
+                {
+                    App.LogToFile("Attempting to load settings from backup file");
+                    string json = await File.ReadAllTextAsync(backupPath);
+                    var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
+
+                    // Initialize required collections
+                    if (loadedSettings.RemovedGamePaths == null)
+                        loadedSettings.RemovedGamePaths = new List<string>();
+
+                    if (loadedSettings.AppliedMods == null)
+                        loadedSettings.AppliedMods = new Dictionary<string, List<AppliedModSetting>>();
+
+                    if (loadedSettings.LastAppliedMods == null)
+                        loadedSettings.LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>();
+
+                    if (loadedSettings.GameProfiles == null)
+                        loadedSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
+
+                    if (loadedSettings.ActiveProfileIds == null)
+                        loadedSettings.ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                    _currentSettings = loadedSettings;
+                    App.LogToFile("Successfully loaded settings from backup file");
+
+                    // Save to main file to repair it
+                    await SaveSettingsAsync();
+
+                    return _currentSettings;
+                }
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error loading settings from backup: {ex.Message}");
+            }
+
+            return _currentSettings;
         }
     }
 

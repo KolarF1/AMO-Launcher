@@ -2398,9 +2398,15 @@ namespace AMO_Launcher
                     var gameProfiles = _profileService.GetProfilesForGame(_currentGame.Id);
 
                     // Add them to the collection
-                    foreach (var profile in gameProfiles)
+                    if (gameProfiles != null && gameProfiles.Count > 0)
                     {
-                        _profiles.Add(profile);
+                        foreach (var profile in gameProfiles)
+                        {
+                            if (profile != null)
+                            {
+                                _profiles.Add(profile);
+                            }
+                        }
                     }
 
                     // Get the active profile
@@ -2416,53 +2422,33 @@ namespace AMO_Launcher
                     App.LogToFile("No game selected, using default profile");
                 }
 
-                // Update the ComboBox
-                ProfileComboBox.Items.Clear();
-                foreach (var profile in _profiles)
-                {
-                    ProfileComboBox.Items.Add(profile.Name);
-                }
-
-                // Select the active profile
-                int indexToSelect = 0;
-                if (_activeProfile != null)
-                {
-                    // Find the index of the active profile
-                    for (int i = 0; i < _profiles.Count; i++)
-                    {
-                        if (_profiles[i].Id == _activeProfile.Id)
-                        {
-                            indexToSelect = i;
-                            break;
-                        }
-                    }
-                }
-
-                // Set the selection
-                if (ProfileComboBox.Items.Count > 0)
-                {
-                    ProfileComboBox.SelectedIndex = indexToSelect;
-                }
-
-                // Connect the selection changed event
-                ProfileComboBox.SelectionChanged += ProfileComboBox_SelectionChanged;
+                // Update the ComboBox in a UI-safe way
+                Dispatcher.Invoke(() => {
+                    UpdateProfileComboBox();
+                });
 
                 App.LogToFile("Profile initialization complete");
             }
             catch (Exception ex)
             {
                 App.LogToFile($"Error initializing profiles: {ex.Message}");
+                App.LogToFile($"Stack trace: {ex.StackTrace}");
 
                 // Fallback to a simple default setup
                 try
                 {
-                    ProfileComboBox.Items.Clear();
-                    ProfileComboBox.Items.Add("Default Profile");
-                    ProfileComboBox.SelectedIndex = 0;
+                    _profiles.Clear();
+                    _profiles.Add(new ModProfile { Name = "Default Profile" });
+                    _activeProfile = _profiles[0];
+
+                    Dispatcher.Invoke(() => {
+                        UpdateProfileComboBox();
+                    });
                 }
                 catch
                 {
                     // Last resort - ignore all errors
+                    App.LogToFile("Failed to create fallback profile");
                 }
             }
         }
@@ -2501,23 +2487,8 @@ namespace AMO_Launcher
                         // Save current mods to the old active profile
                         if (_activeProfile != null)
                         {
-                            // Collect current mods
-                            var currentMods = _appliedMods.Select(m => new AppliedModSetting
-                            {
-                                ModFolderPath = m.ModFolderPath,
-                                IsActive = m.IsActive,
-                                IsFromArchive = m.IsFromArchive,
-                                ArchiveSource = m.ArchiveSource,
-                                ArchiveRootPath = m.ArchiveRootPath
-                            }).ToList();
-
-                            // Update the current active profile
-                            _activeProfile.AppliedMods = new List<AppliedModSetting>(currentMods);
-                            _activeProfile.LastModified = DateTime.Now;
-
-                            // Save to storage via service
-                            await _profileService.UpdateActiveProfileModsAsync(_currentGame.Id, currentMods);
-                            App.LogToFile($"Saved current mods to profile '{_activeProfile.Name}'");
+                            // Save current mods to old profile
+                            await SaveCurrentModsToActiveProfile();
                         }
 
                         // Update the active profile
@@ -2829,7 +2800,12 @@ namespace AMO_Launcher
 
                         // Refresh the profiles list
                         InitializeProfiles();
-                        LoadProfilesIntoDropdown();
+
+                        // Reload mods for the new active profile
+                        if (_activeProfile != null)
+                        {
+                            LoadAppliedModsFromProfile(_activeProfile);
+                        }
 
                         // Show success message
                         MessageBox.Show($"Profile '{selectedProfile.Name}' deleted successfully.", "Profile Deleted",
@@ -2898,10 +2874,10 @@ namespace AMO_Launcher
                 {
                     var currentMods = _appliedMods.Select(m => new AppliedModSetting
                     {
-                        ModFolderPath = m.ModFolderPath,
+                        ModFolderPath = m.IsFromArchive ? null : PathUtility.ToRelativePath(m.ModFolderPath),
                         IsActive = m.IsActive,
                         IsFromArchive = m.IsFromArchive,
-                        ArchiveSource = m.ArchiveSource,
+                        ArchiveSource = m.IsFromArchive ? PathUtility.ToRelativePath(m.ArchiveSource) : null,
                         ArchiveRootPath = m.ArchiveRootPath
                     }).ToList();
 
@@ -2933,18 +2909,14 @@ namespace AMO_Launcher
 
                     try
                     {
+                        // Create a clean copy of the profile with all paths converted to relative
+                        var exportProfile = CreateExportCopy(selectedProfile);
+
                         // Export the profile to the selected path
                         App.LogToFile($"Exporting profile {selectedProfile.Name} to {saveFileDialog.FileName}");
 
-                        // Ensure the profile has the latest mods
-                        string gameId = _currentGame.Id;
-                        string profileId = selectedProfile.Id;
-
-                        // Log the applied mods in memory
-                        App.LogToFile($"Profile AppliedMods count: {selectedProfile.AppliedMods?.Count ?? 0}");
-
-                        // Export directly using File.WriteAllText to avoid issues
-                        string json = System.Text.Json.JsonSerializer.Serialize(selectedProfile, new System.Text.Json.JsonSerializerOptions
+                        // Export using System.Text.Json
+                        string json = System.Text.Json.JsonSerializer.Serialize(exportProfile, new System.Text.Json.JsonSerializerOptions
                         {
                             WriteIndented = true
                         });
@@ -3049,6 +3021,12 @@ namespace AMO_Launcher
                             importedProfile.Name = $"{baseName} (Imported {counter++})";
                         }
 
+                        // Make sure applied mods list is initialized
+                        if (importedProfile.AppliedMods == null)
+                        {
+                            importedProfile.AppliedMods = new List<AppliedModSetting>();
+                        }
+
                         // Add to the ProfileService using its proper methods
                         var imported = await _profileService.ImportProfileDirectAsync(_currentGame.Id, importedProfile);
 
@@ -3132,10 +3110,22 @@ namespace AMO_Launcher
                 {
                     try
                     {
+                        if (setting == null)
+                        {
+                            App.LogToFile("Skipping null mod setting");
+                            continue;
+                        }
+
                         // Convert relative paths to absolute for search
                         string searchPath = setting.IsFromArchive
                             ? PathUtility.ToAbsolutePath(setting.ArchiveSource)
                             : PathUtility.ToAbsolutePath(setting.ModFolderPath);
+
+                        if (string.IsNullOrEmpty(searchPath))
+                        {
+                            App.LogToFile("Skipping mod with empty path");
+                            continue;
+                        }
 
                         App.LogToFile($"Looking for mod: {searchPath}");
 
@@ -3264,103 +3254,148 @@ namespace AMO_Launcher
 
         private void LoadProfilesIntoDropdown()
         {
+            UpdateProfileComboBox();
+        }
+
+        // Helper method to create a clean export copy with all relative paths
+        private ModProfile CreateExportCopy(ModProfile original)
+        {
+            // Create a fresh profile object
+            var copy = new ModProfile
+            {
+                Id = original.Id,
+                Name = original.Name,
+                LastModified = original.LastModified
+            };
+
+            // Create a fresh list of mod settings with all paths correctly relative
+            if (original.AppliedMods != null)
+            {
+                copy.AppliedMods = original.AppliedMods.Select(m => new AppliedModSetting
+                {
+                    // Ensure all paths are relative
+                    ModFolderPath = m.IsFromArchive ? null : EnsureRelativePath(m.ModFolderPath),
+                    IsActive = m.IsActive,
+                    IsFromArchive = m.IsFromArchive,
+                    ArchiveSource = m.IsFromArchive ? EnsureRelativePath(m.ArchiveSource) : null,
+                    ArchiveRootPath = m.ArchiveRootPath
+                }).ToList();
+            }
+            else
+            {
+                copy.AppliedMods = new List<AppliedModSetting>();
+            }
+
+            App.LogToFile($"Created export copy of profile with {copy.AppliedMods.Count} mods, all with relative paths");
+
+            return copy;
+        }
+
+        // Helper to ensure a path is in relative format
+        private string EnsureRelativePath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return path;
+
+            // If already relative, return as is
+            if (!Path.IsPathRooted(path))
+                return path;
+
+            // Convert to relative path
+            return PathUtility.ToRelativePath(path);
+        }
+
+        private void UpdateProfileComboBox()
+        {
             try
             {
-                App.LogToFile("Loading profiles into dropdown");
-                App.LogToFile($"Current game ID: {_currentGame?.Id}"); // Log the exact ID being used
-
-                // Clear dropdown before adding items
+                // Clear the ComboBox
                 ProfileComboBox.Items.Clear();
 
-                // Get profiles for current game
-                if (_currentGame != null)
+                // Add each profile name
+                foreach (var profile in _profiles)
                 {
-                    // IMPORTANT: Get the profiles using the EXACT same ID used for saving
-                    string gameId = _currentGame.Id;
-                    App.LogToFile($"Using game ID for profile lookup: {gameId}");
-
-                    // Get profiles directly from the config service to ensure consistency
-                    _profiles = _configService.GetProfiles(gameId) ?? new List<ModProfile>();
-
-                    if (_profiles.Count == 0)
-                    {
-                        App.LogToFile("No profiles found in config service, creating default profile");
-                        // Create a default profile if none exist
-                        var defaultProfile = new ModProfile();
-                        _profiles = new List<ModProfile> { defaultProfile };
-
-                        // Save this default profile
-                        Task.Run(async () => {
-                            await _profileService.SaveProfilesAsync();
-                        });
-                    }
-
-                    // Get active profile
-                    _activeProfile = _profileService.GetActiveProfile(_currentGame.Id);
-
-                    if (_activeProfile == null && _profiles.Count > 0)
-                    {
-                        _activeProfile = _profiles[0];
-                        // Set this as active
-                        Task.Run(async () => {
-                            await _profileService.SetActiveProfileAsync(gameId, _activeProfile.Id);
-                        });
-                    }
-
-                    App.LogToFile($"Retrieved {_profiles.Count} profiles");
-
-                    // Add each profile name to dropdown
-                    foreach (var profile in _profiles)
+                    if (profile != null)
                     {
                         ProfileComboBox.Items.Add(profile.Name);
-                        App.LogToFile($"Added profile to dropdown: {profile.Name}");
+                    }
+                }
+
+                // Select the active profile
+                if (_activeProfile != null)
+                {
+                    int indexToSelect = -1;
+
+                    // Find the index of the active profile
+                    for (int i = 0; i < _profiles.Count; i++)
+                    {
+                        if (_profiles[i] != null && _profiles[i].Id == _activeProfile.Id)
+                        {
+                            indexToSelect = i;
+                            break;
+                        }
                     }
 
-                    // Select the active profile
-                    if (_activeProfile != null)
+                    // Set the selection
+                    if (indexToSelect >= 0 && indexToSelect < ProfileComboBox.Items.Count)
                     {
-                        int index = _profiles.FindIndex(p => p.Id == _activeProfile.Id);
-                        if (index >= 0 && index < ProfileComboBox.Items.Count)
-                        {
-                            ProfileComboBox.SelectedIndex = index;
-                            App.LogToFile($"Selected profile at index {index}: {_activeProfile.Name}");
-                        }
-                        else if (ProfileComboBox.Items.Count > 0)
-                        {
-                            // Default to first item
-                            ProfileComboBox.SelectedIndex = 0;
-                            App.LogToFile($"Active profile not found in list, selected first profile");
-                        }
+                        ProfileComboBox.SelectedIndex = indexToSelect;
+                        App.LogToFile($"Selected profile at index {indexToSelect}: {_activeProfile.Name}");
                     }
                     else if (ProfileComboBox.Items.Count > 0)
                     {
+                        // Default to first item
                         ProfileComboBox.SelectedIndex = 0;
-                        App.LogToFile($"No active profile, selected first profile");
+                        App.LogToFile($"Active profile not found in list, selected first profile");
                     }
-
-                    App.LogToFile($"Loaded {_profiles.Count} profiles, selected index: {ProfileComboBox.SelectedIndex}");
                 }
-                else
+                else if (ProfileComboBox.Items.Count > 0)
                 {
-                    // No game selected, just add default item
-                    ProfileComboBox.Items.Add("Default Profile");
                     ProfileComboBox.SelectedIndex = 0;
-                    App.LogToFile("No game selected, added default profile placeholder");
+                    App.LogToFile($"No active profile, selected first profile");
                 }
+
+                App.LogToFile($"Loaded {_profiles.Count} profiles, selected index: {ProfileComboBox.SelectedIndex}");
             }
             catch (Exception ex)
             {
-                App.LogToFile($"Error loading profiles: {ex.Message}");
-                App.LogToFile($"Exception stack trace: {ex.StackTrace}");
+                App.LogToFile($"Error updating profile ComboBox: {ex.Message}");
+            }
+        }
 
-                // Fallback to a default item
-                try
+        // Helper method to save current mods to active profile
+        private async Task SaveCurrentModsToActiveProfile()
+        {
+            try
+            {
+                // Skip if no active profile
+                if (_activeProfile == null || _currentGame == null)
                 {
-                    ProfileComboBox.Items.Clear();
-                    ProfileComboBox.Items.Add("Default Profile");
-                    ProfileComboBox.SelectedIndex = 0;
+                    return;
                 }
-                catch { /* Ignore any further errors */ }
+
+                // Collect current mods with relative paths
+                var currentMods = _appliedMods.Select(m => new AppliedModSetting
+                {
+                    ModFolderPath = m.IsFromArchive ? null : PathUtility.ToRelativePath(m.ModFolderPath),
+                    IsActive = m.IsActive,
+                    IsFromArchive = m.IsFromArchive,
+                    ArchiveSource = m.IsFromArchive ? PathUtility.ToRelativePath(m.ArchiveSource) : null,
+                    ArchiveRootPath = m.ArchiveRootPath
+                }).ToList();
+
+                // Update the profile
+                _activeProfile.AppliedMods = new List<AppliedModSetting>(currentMods);
+                _activeProfile.LastModified = DateTime.Now;
+
+                // Save to storage via service
+                await _profileService.UpdateActiveProfileModsAsync(_currentGame.Id, currentMods);
+                App.LogToFile($"Saved current mods to profile '{_activeProfile.Name}'");
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error saving current mods to profile: {ex.Message}");
+                App.LogToFile($"Stack trace: {ex.StackTrace}");
             }
         }
 

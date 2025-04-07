@@ -21,13 +21,17 @@ namespace AMO_Launcher.Services
         public ProfileService(ConfigurationService configService)
         {
             _configService = configService;
-            // Don't do anything complex here that could fail
+            // Initialize with empty dictionaries (case-insensitive)
+            _gameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
+            _activeProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
 
         // Get profiles for a game
         public List<ModProfile> GetProfilesForGame(string gameId)
         {
-            // Simplest possible implementation
+            // Normalize game ID
+            gameId = NormalizeGameId(gameId);
+
             if (string.IsNullOrEmpty(gameId))
             {
                 return new List<ModProfile>();
@@ -38,8 +42,17 @@ namespace AMO_Launcher.Services
             {
                 // Create a default profile
                 var defaultProfile = new ModProfile();
+
+                // Generate a new ID to avoid conflicts
+                defaultProfile.Id = Guid.NewGuid().ToString();
+
+                App.LogToFile($"Creating new default profile for game {gameId} with ID {defaultProfile.Id}");
+
                 _gameProfiles[gameId] = new List<ModProfile> { defaultProfile };
                 _activeProfileIds[gameId] = defaultProfile.Id;
+
+                // Save this new profile to persistent storage
+                Task.Run(() => SaveProfilesAsync()).ConfigureAwait(false);
             }
 
             return _gameProfiles[gameId];
@@ -48,10 +61,18 @@ namespace AMO_Launcher.Services
         // Get active profile
         public ModProfile GetActiveProfile(string gameId)
         {
-            // Simplest possible implementation
-            if (string.IsNullOrEmpty(gameId) || !_gameProfiles.ContainsKey(gameId))
+            // Normalize game ID
+            gameId = NormalizeGameId(gameId);
+
+            if (string.IsNullOrEmpty(gameId))
             {
                 return new ModProfile();
+            }
+
+            // Make sure the profiles list exists
+            if (!_gameProfiles.ContainsKey(gameId))
+            {
+                GetProfilesForGame(gameId); // This creates a default profile if needed
             }
 
             // Get the active profile id
@@ -76,11 +97,21 @@ namespace AMO_Launcher.Services
             // If no active profile found, use the first one
             if (_gameProfiles[gameId].Count > 0)
             {
-                return _gameProfiles[gameId][0];
+                var firstProfile = _gameProfiles[gameId][0];
+                _activeProfileIds[gameId] = firstProfile.Id; // Set as active
+
+                // Save this change
+                Task.Run(() => SaveProfilesAsync()).ConfigureAwait(false);
+
+                return firstProfile;
             }
 
-            // Fallback
-            return new ModProfile();
+            // Shouldn't reach here normally, but create a new profile if needed
+            var newProfile = new ModProfile();
+            _gameProfiles[gameId] = new List<ModProfile> { newProfile };
+            _activeProfileIds[gameId] = newProfile.Id;
+
+            return newProfile;
         }
 
         // Set active profile
@@ -186,6 +217,9 @@ namespace AMO_Launcher.Services
         {
             try
             {
+                // Normalize gameId
+                gameId = NormalizeGameId(gameId);
+
                 App.LogToFile($"CreateProfileAsync: Creating profile '{profileName}' for game {gameId}");
 
                 if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileName))
@@ -207,7 +241,8 @@ namespace AMO_Launcher.Services
                 {
                     Name = profileName,
                     Id = Guid.NewGuid().ToString(),
-                    LastModified = DateTime.Now
+                    LastModified = DateTime.Now,
+                    AppliedMods = new List<AppliedModSetting>() // Initialize with empty list
                 };
                 App.LogToFile($"Created new profile object with ID: {newProfile.Id} and Name: {profileName}");
 
@@ -236,9 +271,13 @@ namespace AMO_Launcher.Services
                     App.LogToFile($"Renamed profile to ensure uniqueness: {newProfile.Name}");
                 }
 
-                // Add the new profile to the collection - not replacing existing profiles
+                // Add the new profile to the collection
                 _gameProfiles[gameId].Add(newProfile);
                 App.LogToFile($"Added new profile to collection, now have {_gameProfiles[gameId].Count} profiles");
+
+                // Set as active profile
+                _activeProfileIds[gameId] = newProfile.Id;
+                App.LogToFile($"Set as active profile: {newProfile.Id}");
 
                 // Save changes to disk immediately
                 await SaveProfilesAsync();
@@ -262,23 +301,26 @@ namespace AMO_Launcher.Services
         }
 
         // Implement delete profile method
-        public Task<bool> DeleteProfileAsync(string gameId, string profileId)
+        public async Task<bool> DeleteProfileAsync(string gameId, string profileId)
         {
             try
             {
+                // Normalize gameId
+                gameId = NormalizeGameId(gameId);
+
                 App.LogToFile($"DeleteProfileAsync: Deleting profile {profileId} from game {gameId}");
 
                 if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileId))
                 {
                     App.LogToFile("DeleteProfileAsync: gameId or profileId is null");
-                    return Task.FromResult(false);
+                    return false;
                 }
 
                 // Check if profiles list exists
                 if (!_gameProfiles.TryGetValue(gameId, out var profiles) || profiles == null)
                 {
                     App.LogToFile($"DeleteProfileAsync: No profiles found for game {gameId}");
-                    return Task.FromResult(false);
+                    return false;
                 }
 
                 // Log all profiles before deletion
@@ -294,7 +336,7 @@ namespace AMO_Launcher.Services
                 if (profileToRemove == null)
                 {
                     App.LogToFile($"DeleteProfileAsync: Profile with ID {profileId} not found");
-                    return Task.FromResult(false);
+                    return false;
                 }
 
                 App.LogToFile($"Found profile to delete: {profileToRemove.Name} (ID: {profileId})");
@@ -321,9 +363,14 @@ namespace AMO_Launcher.Services
                         App.LogToFile("This is the only profile, creating a new default profile");
                         // If this was the only profile, create a new default
                         var defaultProfile = new ModProfile();
-                        profiles.Add(defaultProfile);
+                        _gameProfiles[gameId] = new List<ModProfile> { defaultProfile };
                         _activeProfileIds[gameId] = defaultProfile.Id;
+
+                        // Save changes to disk immediately
+                        await SaveProfilesAsync();
+
                         App.LogToFile($"Created new default profile with ID: {defaultProfile.Id}");
+                        return true; // We've handled this special case
                     }
                 }
 
@@ -338,13 +385,17 @@ namespace AMO_Launcher.Services
                     App.LogToFile($"  - {profile.Name} (ID: {profile.Id})");
                 }
 
-                return Task.FromResult(removed);
+                // Save changes to disk
+                await SaveProfilesAsync();
+                App.LogToFile("Saved profiles after deletion");
+
+                return removed;
             }
             catch (Exception ex)
             {
                 App.LogToFile($"Error in DeleteProfileAsync: {ex.Message}");
                 App.LogToFile($"Stack trace: {ex.StackTrace}");
-                return Task.FromResult(false);
+                return false;
             }
         }
 
@@ -539,12 +590,34 @@ namespace AMO_Launcher.Services
                 {
                     try
                     {
+                        // Skip empty game IDs
+                        if (string.IsNullOrEmpty(gameId))
+                        {
+                            App.LogToFile("Skipping empty gameId");
+                            continue;
+                        }
+
                         // Log detailed info about what we're saving
                         var profiles = _gameProfiles[gameId];
+
+                        // Skip if no profiles to save
+                        if (profiles == null || profiles.Count == 0)
+                        {
+                            App.LogToFile($"No profiles to save for game {gameId}");
+                            continue;
+                        }
+
                         App.LogToFile($"Saving {profiles.Count} profiles for game {gameId}");
 
                         foreach (var profile in profiles)
                         {
+                            // Skip null profiles (shouldn't happen but let's be careful)
+                            if (profile == null)
+                            {
+                                App.LogToFile("Skipping null profile");
+                                continue;
+                            }
+
                             App.LogToFile($"  - Profile: {profile.Name} (ID: {profile.Id}), Mods: {profile.AppliedMods?.Count ?? 0}");
                         }
 
@@ -575,7 +648,7 @@ namespace AMO_Launcher.Services
             {
                 App.LogToFile($"Error saving profiles: {ex.Message}");
                 App.LogToFile($"Stack trace: {ex.StackTrace}");
-                throw; // Rethrow to let caller handle it
+                // Don't rethrow - we want to keep running even if save fails
             }
         }
 
@@ -595,23 +668,56 @@ namespace AMO_Launcher.Services
 
                 foreach (var gameId in gameIds)
                 {
-                    // Load profiles for this game
-                    var profiles = await _configService.LoadProfilesAsync(gameId);
-                    if (profiles != null && profiles.Count > 0)
+                    try
                     {
-                        _gameProfiles[gameId] = profiles;
+                        // Skip empty game IDs
+                        if (string.IsNullOrEmpty(gameId))
+                        {
+                            continue;
+                        }
 
-                        // Load active profile ID
-                        string activeId = await _configService.LoadActiveProfileIdAsync(gameId);
-                        if (!string.IsNullOrEmpty(activeId))
+                        // Load profiles for this game
+                        var profiles = await _configService.LoadProfilesAsync(gameId);
+
+                        // Only add if we got valid profiles
+                        if (profiles != null && profiles.Count > 0)
                         {
-                            _activeProfileIds[gameId] = activeId;
+                            // Filter out any null profiles
+                            var validProfiles = profiles.Where(p => p != null).ToList();
+
+                            if (validProfiles.Count > 0)
+                            {
+                                _gameProfiles[gameId] = validProfiles;
+
+                                // Initialize AppliedMods collection for each profile if needed
+                                foreach (var profile in validProfiles)
+                                {
+                                    if (profile.AppliedMods == null)
+                                    {
+                                        profile.AppliedMods = new List<AppliedModSetting>();
+                                    }
+                                }
+
+                                // Load active profile ID
+                                string activeId = await _configService.LoadActiveProfileIdAsync(gameId);
+                                if (!string.IsNullOrEmpty(activeId))
+                                {
+                                    _activeProfileIds[gameId] = activeId;
+                                }
+                                else if (validProfiles.Count > 0)
+                                {
+                                    // Default to first profile if no active ID saved
+                                    _activeProfileIds[gameId] = validProfiles[0].Id;
+                                }
+
+                                App.LogToFile($"Loaded {validProfiles.Count} profiles for game {gameId}");
+                            }
                         }
-                        else if (profiles.Count > 0)
-                        {
-                            // Default to first profile if no active ID saved
-                            _activeProfileIds[gameId] = profiles[0].Id;
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        App.LogToFile($"Error loading profiles for game {gameId}: {ex.Message}");
+                        // Continue with next game ID
                     }
                 }
 
@@ -620,6 +726,7 @@ namespace AMO_Launcher.Services
             catch (Exception ex)
             {
                 App.LogToFile($"Error loading profiles: {ex.Message}");
+                App.LogToFile($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -654,6 +761,11 @@ namespace AMO_Launcher.Services
                 App.LogToFile($"Stack trace: {ex.StackTrace}");
                 return Task.FromResult<ModProfile>(null);
             }
+        }
+
+        private string NormalizeGameId(string gameId)
+        {
+            return string.IsNullOrEmpty(gameId) ? gameId : gameId.Trim();
         }
     }
 }
