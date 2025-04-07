@@ -568,21 +568,54 @@ namespace AMO_Launcher.Services
                 if (string.IsNullOrEmpty(gameId))
                     return new List<ModProfile>();
 
+                App.LogToFile($"LoadProfilesAsync: Loading profiles for game {gameId}");
+
                 // Make sure settings object exists
                 if (_currentSettings == null)
                     await LoadSettingsAsync();
 
-                // Return empty list if no profiles exist
-                if (_currentSettings.GameProfiles == null ||
-                    !_currentSettings.GameProfiles.ContainsKey(gameId))
-                    return new List<ModProfile>();
+                // Initialize if needed
+                if (_currentSettings.GameProfiles == null)
+                    _currentSettings.GameProfiles = new Dictionary<string, List<ModProfile>>();
 
-                // Return the profiles
-                return _currentSettings.GameProfiles[gameId];
+                // Log all available game IDs for debugging
+                App.LogToFile("Available game IDs in settings:");
+                foreach (var id in _currentSettings.GameProfiles.Keys)
+                {
+                    App.LogToFile($"  - {id}");
+                }
+
+                // IMPORTANT: Check for exact ID match first
+                if (_currentSettings.GameProfiles.TryGetValue(gameId, out var profiles))
+                {
+                    App.LogToFile($"Found {profiles.Count} profiles with exact ID match for {gameId}");
+                    return profiles;
+                }
+
+                // If no exact match, try fuzzy match by game name
+                string gameName = gameId.Split('_')[0]; // Extract name part (e.g., "F1 24")
+                foreach (var entry in _currentSettings.GameProfiles)
+                {
+                    if (entry.Key.StartsWith(gameName + "_") || entry.Key == gameName)
+                    {
+                        App.LogToFile($"Found profiles using fuzzy match: {entry.Key}");
+
+                        // IMPORTANT: Save these profiles with the new ID to avoid future mismatches
+                        _currentSettings.GameProfiles[gameId] = entry.Value;
+                        await SaveSettingsAsync();
+
+                        return entry.Value;
+                    }
+                }
+
+                // If no profiles found at all, create a new list (but don't save it yet)
+                App.LogToFile($"No profiles found for game {gameId}, returning empty list");
+                return new List<ModProfile>();
             }
             catch (Exception ex)
             {
-                App.LogToFile($"Error loading profiles: {ex.Message}");
+                App.LogToFile($"Error in LoadProfilesAsync: {ex.Message}");
+                App.LogToFile($"Stack trace: {ex.StackTrace}");
                 return new List<ModProfile>();
             }
         }
@@ -610,6 +643,65 @@ namespace AMO_Launcher.Services
             {
                 App.LogToFile($"Error loading active profile ID: {ex.Message}");
                 return null;
+            }
+        }
+
+        public List<ModProfile> GetProfiles(string gameId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(gameId))
+                    return new List<ModProfile>();
+
+                // Log the exact game ID we're looking for
+                App.LogToFile($"GetProfiles: Looking for profiles with game ID: {gameId}");
+
+                // Also log all available game IDs in GameProfiles
+                if (_currentSettings?.GameProfiles != null)
+                {
+                    foreach (var key in _currentSettings.GameProfiles.Keys)
+                    {
+                        App.LogToFile($"Available profile game ID: {key}");
+                    }
+                }
+                else
+                {
+                    App.LogToFile("GameProfiles dictionary is null or empty");
+                }
+
+                // Return empty list if no profiles exist
+                if (_currentSettings?.GameProfiles == null)
+                    return new List<ModProfile>();
+
+                // Check if there are profiles for this exact game ID
+                if (_currentSettings.GameProfiles.TryGetValue(gameId, out var exactProfiles))
+                {
+                    App.LogToFile($"Found {exactProfiles.Count} profiles with exact ID match");
+                    return exactProfiles;
+                }
+
+                // If not found with the exact ID, try to match by game name portion
+                // This handles cases where the ID format changed but the name part is consistent
+                string gameName = gameId.Split('_')[0]; // Extract name part before underscore
+
+                foreach (var entry in _currentSettings.GameProfiles)
+                {
+                    // Check if the key starts with the game name
+                    if (entry.Key.StartsWith(gameName + "_") || entry.Key == gameName)
+                    {
+                        App.LogToFile($"Found profiles using partial name match: {entry.Key}");
+                        return entry.Value;
+                    }
+                }
+
+                // No profiles found
+                App.LogToFile("No profiles found for this game");
+                return new List<ModProfile>();
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error in GetProfiles: {ex.Message}");
+                return new List<ModProfile>();
             }
         }
     }

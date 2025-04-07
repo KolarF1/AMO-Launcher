@@ -152,7 +152,26 @@ namespace AMO_Launcher.Models
         // Call this after setting Name and ExecutablePath
         public void GenerateId()
         {
-            Id = $"{Name ?? "Unknown"}_{ExecutablePath?.GetHashCode() ?? 0}";
+            // Use this format consistently everywhere
+            string gameName = Name ?? "Unknown";
+
+            // Use a more stable hash format that won't change between app launches
+            string executablePathHash = "";
+            if (!string.IsNullOrEmpty(ExecutablePath))
+            {
+                using (var md5 = System.Security.Cryptography.MD5.Create())
+                {
+                    byte[] pathBytes = System.Text.Encoding.UTF8.GetBytes(ExecutablePath);
+                    byte[] hashBytes = md5.ComputeHash(pathBytes);
+                    executablePathHash = BitConverter.ToString(hashBytes).Replace("-", "").Substring(0, 8).ToLowerInvariant();
+                }
+            }
+            else
+            {
+                executablePathHash = "00000000";
+            }
+
+            Id = $"{gameName}_{executablePathHash}";
         }
 
         public override string ToString()

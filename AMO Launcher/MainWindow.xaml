@@ -188,14 +188,14 @@
 
                                     <!-- FIXED: Explicitly set Foreground to ensure text visibility -->
                                     <TextBlock Grid.Column="0"
-                                             x:Name="ContentSite" 
-                                             Text="{Binding SelectedItem.Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                             TextTrimming="CharacterEllipsis"
-                                             VerticalAlignment="Center" 
-                                             Margin="6,0,6,0"
-                                             MinWidth="50"
-                                             TextAlignment="Left"
-                                             Foreground="Black"/>
+                                               x:Name="ContentSite" 
+                                               Text="{Binding SelectedItem, RelativeSource={RelativeSource TemplatedParent}}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" 
+                                               Margin="6,0,6,0"
+                                               MinWidth="50"
+                                               TextAlignment="Left"
+                                               Foreground="Black"/>
 
                                     <!-- Dropdown Arrow -->
                                     <iconPacks:PackIconBootstrapIcons Grid.Column="1" 

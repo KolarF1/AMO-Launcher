@@ -17,9 +17,36 @@ namespace AMO_Launcher
         public static ProfileService ProfileService { get; private set; } = null!; // New service
 
         // Log file for debugging
-        private static string LogFilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-            "AMO_Launcher_Debug.log");
+        private static readonly string LogFilePath;
+
+        // Static constructor to initialize the log file path
+        static App()
+        {
+            // Use the same AppData folder that ConfigurationService uses
+            string appDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AMO_Launcher");
+
+            // Create directory if it doesn't exist
+            if (!Directory.Exists(appDataPath))
+            {
+                try
+                {
+                    Directory.CreateDirectory(appDataPath);
+                }
+                catch
+                {
+                    // If we can't create the directory, fall back to desktop
+                    LogFilePath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        "AMO_Launcher_Debug.log");
+                    return;
+                }
+            }
+
+            // Set the log file path to the AppData location
+            LogFilePath = Path.Combine(appDataPath, "AMO_Launcher_Debug.log");
+        }
 
         public App()
         {
@@ -56,12 +83,12 @@ namespace AMO_Launcher
             catch (Exception ex)
             {
                 LogToFile($"FATAL ERROR in OnStartup: {ex}");
-                MessageBox.Show($"Fatal error during startup: {ex.Message}\n\nSee log file on desktop for details.",
+                MessageBox.Show($"Fatal error during startup: {ex.Message}\n\nSee log file in AppData/Roaming/AMO_Launcher for details.",
                     "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private void InitializeServices()
+        private async void InitializeServices()
         {
             try
             {
@@ -93,6 +120,10 @@ namespace AMO_Launcher
                 // Initialize the profile service (after ConfigService)
                 ProfileService = new ProfileService(ConfigService);
 
+                // Load profiles from persistent storage
+                await ProfileService.LoadProfilesAsync();
+                LogToFile("Profiles loaded from persistent storage");
+
                 // Log successful initialization
                 LogToFile("All services initialized successfully");
             }
@@ -101,7 +132,7 @@ namespace AMO_Launcher
                 LogToFile($"ERROR in InitializeServices: {ex}");
 
                 // Handle any initialization errors
-                MessageBox.Show($"Error initializing services: {ex.Message}\n\nThe application may not function correctly.\n\nSee log file on desktop for details.",
+                MessageBox.Show($"Error initializing services: {ex.Message}\n\nThe application may not function correctly.\n\nSee log file in AppData/Roaming/AMO_Launcher for details.",
                     "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
 
                 // Initialize with fallback empty services if needed
@@ -149,7 +180,7 @@ namespace AMO_Launcher
             }
         }
 
-        // Log to a file on the desktop for debugging
+        // Log to a file in AppData/Roaming/AMO_Launcher folder
         public static void LogToFile(string message)
         {
             try
@@ -170,7 +201,7 @@ namespace AMO_Launcher
         {
             LogToFile($"UNHANDLED EXCEPTION: {e.Exception}");
 
-            MessageBox.Show($"An unhandled exception occurred: {e.Exception.Message}\n\nPlease restart the application.\n\nSee log file on desktop for details.",
+            MessageBox.Show($"An unhandled exception occurred: {e.Exception.Message}\n\nPlease restart the application.\n\nSee log file in AppData/Roaming/AMO_Launcher for details.",
                 "Error", MessageBoxButton.OK, MessageBoxImage.Error);
 
             // Mark as handled to prevent application crash
