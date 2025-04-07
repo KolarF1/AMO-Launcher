@@ -480,6 +480,138 @@ namespace AMO_Launcher.Services
             // No differences found
             return false;
         }
+
+        public async Task SaveProfilesAsync(string gameId, List<ModProfile> profiles)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(gameId) || profiles == null)
+                    return;
+
+                // Make sure settings object exists
+                if (_currentSettings == null)
+                    await LoadSettingsAsync();
+
+                // Ensure the game profiles dictionary exists
+                if (_currentSettings.GameProfiles == null)
+                    _currentSettings.GameProfiles = new Dictionary<string, List<ModProfile>>();
+
+                // Save the profiles
+                _currentSettings.GameProfiles[gameId] = profiles;
+
+                // Save settings to disk
+                await SaveSettingsAsync();
+
+                App.LogToFile($"Saved {profiles.Count} profiles for game {gameId}");
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error saving profiles: {ex.Message}");
+            }
+        }
+
+        public async Task SaveActiveProfileIdAsync(string gameId, string profileId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileId))
+                    return;
+
+                // Make sure settings object exists
+                if (_currentSettings == null)
+                    await LoadSettingsAsync();
+
+                // Ensure the active profiles dictionary exists
+                if (_currentSettings.ActiveProfileIds == null)
+                    _currentSettings.ActiveProfileIds = new Dictionary<string, string>();
+
+                // Save the active profile ID
+                _currentSettings.ActiveProfileIds[gameId] = profileId;
+
+                // Save settings to disk
+                await SaveSettingsAsync();
+
+                App.LogToFile($"Saved active profile ID {profileId} for game {gameId}");
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error saving active profile ID: {ex.Message}");
+            }
+        }
+
+        public async Task<List<string>> GetGameIdsWithProfilesAsync()
+        {
+            try
+            {
+                // Make sure settings object exists
+                if (_currentSettings == null)
+                    await LoadSettingsAsync();
+
+                // Return empty list if no profiles exist
+                if (_currentSettings.GameProfiles == null)
+                    return new List<string>();
+
+                // Return all game IDs with profiles
+                return new List<string>(_currentSettings.GameProfiles.Keys);
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error getting game IDs with profiles: {ex.Message}");
+                return new List<string>();
+            }
+        }
+
+        public async Task<List<ModProfile>> LoadProfilesAsync(string gameId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(gameId))
+                    return new List<ModProfile>();
+
+                // Make sure settings object exists
+                if (_currentSettings == null)
+                    await LoadSettingsAsync();
+
+                // Return empty list if no profiles exist
+                if (_currentSettings.GameProfiles == null ||
+                    !_currentSettings.GameProfiles.ContainsKey(gameId))
+                    return new List<ModProfile>();
+
+                // Return the profiles
+                return _currentSettings.GameProfiles[gameId];
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error loading profiles: {ex.Message}");
+                return new List<ModProfile>();
+            }
+        }
+
+        public async Task<string> LoadActiveProfileIdAsync(string gameId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(gameId))
+                    return null;
+
+                // Make sure settings object exists
+                if (_currentSettings == null)
+                    await LoadSettingsAsync();
+
+                // Return null if no active profile ID exists
+                if (_currentSettings.ActiveProfileIds == null ||
+                    !_currentSettings.ActiveProfileIds.ContainsKey(gameId))
+                    return null;
+
+                // Return the active profile ID
+                return _currentSettings.ActiveProfileIds[gameId];
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error loading active profile ID: {ex.Message}");
+                return null;
+            }
+        }
     }
 
     // Classes for serialization
@@ -491,6 +623,8 @@ namespace AMO_Launcher.Services
         public string LastGameId { get; set; }
         public Dictionary<string, List<AppliedModSetting>> AppliedMods { get; set; } = new Dictionary<string, List<AppliedModSetting>>();
         public Dictionary<string, List<AppliedModSetting>> LastAppliedMods { get; set; } = new Dictionary<string, List<AppliedModSetting>>();
+        public Dictionary<string, List<ModProfile>> GameProfiles { get; set; } = new Dictionary<string, List<ModProfile>>();
+        public Dictionary<string, string> ActiveProfileIds { get; set; } = new Dictionary<string, string>();
     }
 
     public class GameSetting

@@ -109,6 +109,9 @@ namespace AMO_Launcher
                     ProfileComboBox.Items.Add("Default Profile");
                     ProfileComboBox.SelectedIndex = 0;
                 }
+
+                // Initialize UI components including buttons
+                InitializeUi();
             }
             catch (Exception ex)
             {
@@ -2602,6 +2605,27 @@ namespace AMO_Launcher
                     App.LogToFile("New Profile button wired up");
                 }
 
+                // Wire up the Delete Profile button
+                if (DeleteProfileButton != null)
+                {
+                    DeleteProfileButton.Click += DeleteProfileButton_Click;
+                    App.LogToFile("Delete Profile button wired up");
+                }
+
+                // Wire up the Export Profile button
+                if (ExportProfileButton != null)
+                {
+                    ExportProfileButton.Click += ExportProfileButton_Click;
+                    App.LogToFile("Export Profile button wired up");
+                }
+
+                // Wire up the Import Profile button
+                if (ImportProfileButton != null)
+                {
+                    ImportProfileButton.Click += ImportProfileButton_Click;
+                    App.LogToFile("Import Profile button wired up");
+                }
+
                 App.LogToFile("Profile UI initialization complete");
             }
             catch (Exception ex)
@@ -2637,31 +2661,38 @@ namespace AMO_Launcher
                 // Show wait cursor
                 Mouse.OverrideCursor = Cursors.Wait;
 
-                // Create the profile
-                var newProfile = await _profileService.CreateProfileAsync(_currentGame.Id, profileName);
-
-                // Restore cursor
-                Mouse.OverrideCursor = null;
-
-                if (newProfile != null)
+                try
                 {
-                    App.LogToFile($"New profile created: {newProfile.Name}");
+                    // Create the profile
+                    var newProfile = await _profileService.CreateProfileAsync(_currentGame.Id, profileName);
 
-                    // Add to collection
-                    _profiles.Add(newProfile);
+                    if (newProfile != null)
+                    {
+                        App.LogToFile($"New profile created: {newProfile.Name} with ID {newProfile.Id}");
 
-                    // Refresh the ComboBox
-                    InitializeProfiles();
+                        // This is the key part - save profiles to persistent storage
+                        await _profileService.SaveProfilesAsync();
+                        App.LogToFile("Profiles saved to storage");
 
-                    // Show success message
-                    MessageBox.Show($"Profile '{newProfile.Name}' created successfully.", "Profile Created",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                        // Refresh the UI
+                        InitializeProfiles();
+                        LoadProfilesIntoDropdown();
+
+                        // Show success message
+                        MessageBox.Show($"Profile '{newProfile.Name}' created successfully.", "Profile Created",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        App.LogToFile("Failed to create profile");
+                        MessageBox.Show("Failed to create the profile. Please try again.", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
-                else
+                finally
                 {
-                    App.LogToFile("Failed to create profile");
-                    MessageBox.Show("Failed to create the profile. Please try again.", "Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    // Restore cursor
+                    Mouse.OverrideCursor = null;
                 }
             }
             catch (Exception ex)
@@ -2671,6 +2702,211 @@ namespace AMO_Launcher
 
                 App.LogToFile($"Error creating profile: {ex.Message}");
                 MessageBox.Show($"Error creating profile: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                App.LogToFile("Delete Profile button clicked");
+
+                if (_currentGame == null)
+                {
+                    MessageBox.Show("Please select a game first.", "No Game Selected",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (_profiles.Count <= 1)
+                {
+                    MessageBox.Show("Cannot delete the only profile. At least one profile must exist.",
+                        "Cannot Delete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // Get the selected profile
+                int selectedIndex = ProfileComboBox.SelectedIndex;
+                if (selectedIndex < 0 || selectedIndex >= _profiles.Count)
+                {
+                    return;
+                }
+
+                ModProfile selectedProfile = _profiles[selectedIndex];
+
+                // Confirm deletion
+                var result = MessageBox.Show($"Are you sure you want to delete the profile '{selectedProfile.Name}'?\n\nThis action cannot be undone.",
+                    "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+                if (result != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+
+                // Show wait cursor
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                // Delete the profile
+                bool deleted = await _profileService.DeleteProfileAsync(_currentGame.Id, selectedProfile.Id);
+
+                // Restore cursor
+                Mouse.OverrideCursor = null;
+
+                if (deleted)
+                {
+                    App.LogToFile($"Profile deleted: {selectedProfile.Name}");
+
+                    // Refresh the profiles list
+                    InitializeProfiles();
+                    LoadProfilesIntoDropdown();
+                }
+                else
+                {
+                    App.LogToFile("Failed to delete profile");
+                    MessageBox.Show("Failed to delete the profile. Please try again.", "Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Restore cursor in case of error
+                Mouse.OverrideCursor = null;
+
+                App.LogToFile($"Error deleting profile: {ex.Message}");
+                MessageBox.Show($"Error deleting profile: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void ExportProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                App.LogToFile("Export Profile button clicked");
+
+                if (_currentGame == null)
+                {
+                    MessageBox.Show("Please select a game first.", "No Game Selected",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Get the selected profile
+                int selectedIndex = ProfileComboBox.SelectedIndex;
+                if (selectedIndex < 0 || selectedIndex >= _profiles.Count)
+                {
+                    return;
+                }
+
+                ModProfile selectedProfile = _profiles[selectedIndex];
+
+                // Create a SaveFileDialog
+                var saveFileDialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "Export Profile",
+                    Filter = "JSON Files (*.json)|*.json",
+                    DefaultExt = ".json",
+                    FileName = $"{_currentGame.Name}_{selectedProfile.Name}_{DateTime.Now:yyyyMMdd}.json",
+                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    // Show wait cursor
+                    Mouse.OverrideCursor = Cursors.Wait;
+
+                    // Export the profile to the selected path
+                    bool exported = await _profileService.ExportProfileAsync(_currentGame.Id, selectedProfile.Id, saveFileDialog.FileName);
+
+                    // Restore cursor
+                    Mouse.OverrideCursor = null;
+
+                    if (exported)
+                    {
+                        App.LogToFile($"Profile exported to: {saveFileDialog.FileName}");
+                        MessageBox.Show($"Profile '{selectedProfile.Name}' exported successfully.", "Profile Exported",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        App.LogToFile("Failed to export profile");
+                        MessageBox.Show("Failed to export the profile. Please try again.", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Restore cursor in case of error
+                Mouse.OverrideCursor = null;
+
+                App.LogToFile($"Error exporting profile: {ex.Message}");
+                MessageBox.Show($"Error exporting profile: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void ImportProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                App.LogToFile("Import Profile button clicked");
+
+                if (_currentGame == null)
+                {
+                    MessageBox.Show("Please select a game first.", "No Game Selected",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Create an OpenFileDialog
+                var openFileDialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Import Profile",
+                    Filter = "JSON Files (*.json)|*.json",
+                    DefaultExt = ".json",
+                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    // Show wait cursor
+                    Mouse.OverrideCursor = Cursors.Wait;
+
+                    // Import the profile
+                    var importedProfile = await _profileService.ImportProfileAsync(_currentGame.Id, openFileDialog.FileName);
+
+                    // Restore cursor
+                    Mouse.OverrideCursor = null;
+
+                    if (importedProfile != null)
+                    {
+                        App.LogToFile($"Profile imported: {importedProfile.Name}");
+
+                        // Refresh the profiles list
+                        InitializeProfiles();
+                        LoadProfilesIntoDropdown();
+
+                        // Show success message
+                        MessageBox.Show($"Profile '{importedProfile.Name}' imported successfully.", "Profile Imported",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        App.LogToFile("Failed to import profile");
+                        MessageBox.Show("Failed to import the profile. The file may be invalid or corrupted.", "Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Restore cursor in case of error
+                Mouse.OverrideCursor = null;
+
+                App.LogToFile($"Error importing profile: {ex.Message}");
+                MessageBox.Show($"Error importing profile: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
