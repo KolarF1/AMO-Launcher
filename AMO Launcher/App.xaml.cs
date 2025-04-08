@@ -124,8 +124,15 @@ namespace AMO_Launcher
                 await ProfileService.LoadProfilesAsync();
                 LogToFile("Profiles loaded from persistent storage");
 
-                // Migrate profiles to normalize game IDs
+                // Run deduplication to clean up any existing duplicate profiles
+                await ProfileService.DeduplicateProfilesAsync();
+
+                // Normalize all game IDs to ensure consistency
                 await ProfileService.MigrateGameProfilesAsync();
+
+                // Save all changes to ensure profiles are consistent
+                await ProfileService.SaveProfilesAsync();
+                LogToFile("Profiles saved after normalization and deduplication");
 
                 // Log successful initialization
                 LogToFile("All services initialized successfully");

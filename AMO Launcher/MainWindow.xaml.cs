@@ -517,8 +517,10 @@ namespace AMO_Launcher
             // Scan for mods for the selected game
             await ScanForModsAsync();
 
+            // Initialize profiles once
             InitializeProfiles();
-            LoadProfilesIntoDropdown();
+            // LoadProfilesIntoDropdown is already called within InitializeProfiles via UpdateProfileComboBox
+            // so we don't need to call it again here
         }
 
         // Scan for mods for the current game
@@ -2394,8 +2396,12 @@ namespace AMO_Launcher
                 // Get profiles for the current game
                 if (_currentGame != null)
                 {
+                    // Get normalized game ID
+                    string normalizedGameId = GetNormalizedCurrentGameId();
+                    App.LogToFile($"Getting profiles for normalized game ID: {normalizedGameId}");
+
                     // Get profiles for this game
-                    var gameProfiles = _profileService.GetProfilesForGame(_currentGame.Id);
+                    var gameProfiles = _profileService.GetProfilesForGame(normalizedGameId);
 
                     // Add them to the collection
                     if (gameProfiles != null && gameProfiles.Count > 0)
@@ -2410,7 +2416,7 @@ namespace AMO_Launcher
                     }
 
                     // Get the active profile
-                    _activeProfile = _profileService.GetActiveProfile(_currentGame.Id);
+                    _activeProfile = _profileService.GetActiveProfile(normalizedGameId);
 
                     App.LogToFile($"Loaded {_profiles.Count} profiles for game {_currentGame.Name}");
                 }
@@ -2474,10 +2480,11 @@ namespace AMO_Launcher
                     // If it's already the active profile, do nothing
                     if (_activeProfile != null && selectedProfile.Id == _activeProfile.Id)
                     {
+                        App.LogToFile($"Already on profile: {selectedProfile.Name}, no change needed");
                         return;
                     }
 
-                    App.LogToFile($"Switching to profile: {selectedProfile.Name}");
+                    App.LogToFile($"Switching from '{_activeProfile?.Name}' to '{selectedProfile.Name}'");
 
                     try
                     {
@@ -2487,15 +2494,21 @@ namespace AMO_Launcher
                         // Save current mods to the old active profile
                         if (_activeProfile != null)
                         {
-                            // Save current mods to old profile
+                            App.LogToFile($"Saving current profile '{_activeProfile.Name}' before switching");
                             await SaveCurrentModsToActiveProfile();
+                            App.LogToFile("Save completed");
                         }
 
-                        // Update the active profile
+                        App.LogToFile($"Setting new active profile: {selectedProfile.Name}");
+
+                        // Update the active profile in memory
                         _activeProfile = selectedProfile;
 
-                        // Tell the service this is now the active profile
-                        await _profileService.SetActiveProfileAsync(_currentGame.Id, _activeProfile.Id);
+                        // Use normalized game ID
+                        string normalizedGameId = GetNormalizedCurrentGameId();
+
+                        // Tell the service this is now the active profile with normalized game ID
+                        await _profileService.SetActiveProfileAsync(normalizedGameId, _activeProfile.Id);
 
                         // Load mods from this profile
                         LoadAppliedModsFromProfile(_activeProfile);
@@ -2680,8 +2693,19 @@ namespace AMO_Launcher
 
                 try
                 {
-                    // Create the profile
-                    var newProfile = await _profileService.CreateProfileAsync(_currentGame.Id, profileName);
+                    // IMPORTANT: Save current mods to active profile BEFORE creating a new one
+                    if (_activeProfile != null)
+                    {
+                        App.LogToFile($"Saving current active profile '{_activeProfile?.Name}' before creating new one");
+                        await SaveCurrentModsToActiveProfile();
+                    }
+
+                    // Get normalized game ID
+                    string normalizedGameId = GetNormalizedCurrentGameId();
+                    App.LogToFile($"Using normalized game ID: {normalizedGameId}");
+
+                    // Create the profile using normalized game ID
+                    var newProfile = await _profileService.CreateProfileAsync(normalizedGameId, profileName);
 
                     if (newProfile != null)
                     {
@@ -2691,19 +2715,37 @@ namespace AMO_Launcher
                         await _profileService.SaveProfilesAsync();
                         App.LogToFile("Profiles saved to storage");
 
+                        // Store the current active profile ID before we change it
+                        string oldActiveProfileId = _activeProfile?.Id;
+
                         // Set this as the active profile
-                        await _profileService.SetActiveProfileAsync(_currentGame.Id, newProfile.Id);
+                        _activeProfile = newProfile;
+                        await _profileService.SetActiveProfileAsync(normalizedGameId, _activeProfile.Id);
 
-                        // Refresh the UI
+                        // Refresh the UI profiles list
                         InitializeProfiles();
-                        LoadProfilesIntoDropdown();
 
-                        // Explicitly select the new profile
+                        // Find the new profile index
                         int newProfileIndex = _profiles.FindIndex(p => p.Id == newProfile.Id);
+
+                        // Temporarily remove the selection changed event handler
+                        ProfileComboBox.SelectionChanged -= ProfileComboBox_SelectionChanged;
+
+                        // Select the new profile in the dropdown without triggering event
                         if (newProfileIndex >= 0 && newProfileIndex < ProfileComboBox.Items.Count)
                         {
                             ProfileComboBox.SelectedIndex = newProfileIndex;
                         }
+
+                        // Restore the event handler
+                        ProfileComboBox.SelectionChanged += ProfileComboBox_SelectionChanged;
+
+                        // Clear applied mods list (new profile starts empty)
+                        _appliedMods.Clear();
+                        AppliedModsListView.Visibility = Visibility.Collapsed;
+
+                        // Force UI refresh
+                        AppliedModsListView.Items.Refresh();
 
                         // Show success message
                         MessageBox.Show($"Profile '{newProfile.Name}' created successfully.", "Profile Created",
@@ -3093,12 +3135,26 @@ namespace AMO_Launcher
         {
             try
             {
-                App.LogToFile($"Loading mods from profile: {profile.Name}");
+                App.LogToFile($"Loading mods from profile: {profile.Name} (ID: {profile.Id})");
 
                 // Clear current applied mods
                 _appliedMods.Clear();
 
-                if (profile?.AppliedMods == null || profile.AppliedMods.Count == 0)
+                if (profile == null)
+                {
+                    App.LogToFile("Profile is null");
+                    AppliedModsListView.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                // Initialize AppliedMods if null to prevent exceptions
+                if (profile.AppliedMods == null)
+                {
+                    profile.AppliedMods = new List<AppliedModSetting>();
+                    App.LogToFile("Profile had null AppliedMods list, initialized as empty");
+                }
+
+                if (profile.AppliedMods.Count == 0)
                 {
                     App.LogToFile("No mods in profile");
                     AppliedModsListView.Visibility = Visibility.Collapsed;
@@ -3107,7 +3163,31 @@ namespace AMO_Launcher
 
                 App.LogToFile($"Profile contains {profile.AppliedMods.Count} mods");
 
-                // For each saved mod in the profile, find the corresponding mod in available mods
+                // Create a lookup dictionary of all available mods for faster searching
+                Dictionary<string, ModInfo> availableMods = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
+                foreach (var mod in _availableModsFlat)
+                {
+                    // Use both possible keys to find the mod - by archive path or folder path
+                    if (mod.IsFromArchive && !string.IsNullOrEmpty(mod.ArchiveSource))
+                    {
+                        string key = PathUtility.ToAbsolutePath(mod.ArchiveSource);
+                        if (!availableMods.ContainsKey(key))
+                        {
+                            availableMods[key] = mod;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(mod.ModFolderPath))
+                    {
+                        string key = PathUtility.ToAbsolutePath(mod.ModFolderPath);
+                        if (!availableMods.ContainsKey(key))
+                        {
+                            availableMods[key] = mod;
+                        }
+                    }
+                }
+
+                // For each saved mod in the profile, find the corresponding mod
                 foreach (var setting in profile.AppliedMods)
                 {
                     try
@@ -3131,20 +3211,19 @@ namespace AMO_Launcher
 
                         App.LogToFile($"Looking for mod: {searchPath}");
 
-                        // First try to find mod in available mods
-                        var mod = _availableModsFlat.FirstOrDefault(m =>
-                            PathUtility.ToAbsolutePath(m.ModFolderPath) == searchPath ||
-                            (m.IsFromArchive && PathUtility.ToAbsolutePath(m.ArchiveSource) == searchPath));
-
-                        if (mod != null)
+                        // First try dictionary lookup (much faster)
+                        if (availableMods.TryGetValue(searchPath, out var mod))
                         {
                             // Set properties and add to applied mods
                             mod.IsApplied = true;
                             mod.IsActive = setting.IsActive;
                             _appliedMods.Add(mod);
                             App.LogToFile($"Added mod to applied list: {mod.Name}");
+                            continue;
                         }
-                        else if (setting.IsFromArchive && !string.IsNullOrEmpty(setting.ArchiveSource))
+
+                        // Fall back to directory/file checking if not found in dictionary
+                        if (setting.IsFromArchive && !string.IsNullOrEmpty(setting.ArchiveSource))
                         {
                             App.LogToFile($"Mod not found in available mods, trying to load archive directly");
 
@@ -3248,7 +3327,7 @@ namespace AMO_Launcher
                 UpdateModPriorities();
                 UpdateModPriorityDisplays();
                 DetectModConflicts();
-                App.LogToFile("Updated mod priorities and conflicts");
+                App.LogToFile($"Updated mod priorities and conflicts, applied mods count: {_appliedMods.Count}");
             }
             catch (Exception ex)
             {
@@ -3373,11 +3452,14 @@ namespace AMO_Launcher
         {
             try
             {
-                // Skip if no active profile
+                // Skip if no active profile or game
                 if (_activeProfile == null || _currentGame == null)
                 {
+                    App.LogToFile("Cannot save mods - no active profile or game");
                     return;
                 }
+
+                App.LogToFile($"SaveCurrentModsToActiveProfile: Saving mods to '{_activeProfile.Name}' (ID: {_activeProfile.Id})");
 
                 // Collect current mods with relative paths
                 var currentMods = _appliedMods.Select(m => new AppliedModSetting
@@ -3389,19 +3471,55 @@ namespace AMO_Launcher
                     ArchiveRootPath = m.ArchiveRootPath
                 }).ToList();
 
-                // Update the profile
+                // Log what we're saving
+                App.LogToFile($"Saving {currentMods.Count} mods to active profile");
+                foreach (var mod in currentMods)
+                {
+                    App.LogToFile($"  - Mod: {(mod.IsFromArchive ? mod.ArchiveSource : mod.ModFolderPath)}, Active: {mod.IsActive}");
+                }
+
+                // Update the profile object in memory
                 _activeProfile.AppliedMods = new List<AppliedModSetting>(currentMods);
                 _activeProfile.LastModified = DateTime.Now;
 
-                // Save to storage via service
-                await _profileService.UpdateActiveProfileModsAsync(_currentGame.Id, currentMods);
-                App.LogToFile($"Saved current mods to profile '{_activeProfile.Name}'");
+                // Save to ProfileService using normalized gameId
+                string normalizedGameId = GetNormalizedCurrentGameId();
+                await _profileService.UpdateActiveProfileModsAsync(normalizedGameId, currentMods);
+
+                App.LogToFile($"Successfully saved {currentMods.Count} mods to profile '{_activeProfile.Name}'");
             }
             catch (Exception ex)
             {
                 App.LogToFile($"Error saving current mods to profile: {ex.Message}");
                 App.LogToFile($"Stack trace: {ex.StackTrace}");
             }
+        }
+
+        private string NormalizeGameId(string gameId)
+        {
+            if (string.IsNullOrEmpty(gameId))
+                return gameId;
+
+            // Trim any whitespace
+            gameId = gameId.Trim();
+
+            // Remove any suffix after underscore
+            int underscoreIndex = gameId.IndexOf('_');
+            if (underscoreIndex > 0)
+            {
+                return gameId.Substring(0, underscoreIndex);
+            }
+
+            return gameId;
+        }
+
+        // Apply game ID normalization to the current game
+        private string GetNormalizedCurrentGameId()
+        {
+            if (_currentGame == null)
+                return null;
+
+            return NormalizeGameId(_currentGame.Id);
         }
 
 
