@@ -44,6 +44,9 @@ namespace AMO_Launcher
             InitializeComponent();
             InitializeConflictSystem();
 
+            App.UpdateService.UpdateAvailable += UpdateService_UpdateAvailable;
+            App.UpdateService.UpdateCheckFailed += UpdateService_UpdateCheckFailed;
+
             _availableModsFlat = new ObservableCollection<ModInfo>();
             _availableModsCategories = new ObservableCollection<ModCategory>();
             _appliedMods = new ObservableCollection<ModInfo>();
@@ -3201,6 +3204,83 @@ namespace AMO_Launcher
             {
                 Mouse.OverrideCursor = null;
             }
+        }
+
+        private void UpdateService_UpdateAvailable(object sender, UpdateAvailableEventArgs e)
+        {
+            try
+            {
+                Dispatcher.Invoke(async () =>
+                {
+                    var updateDialog = new Views.UpdateAvailableDialog(e.CurrentVersion, e.NewVersion, e.ReleaseNotes);
+                    updateDialog.Owner = this;
+
+                    bool? result = updateDialog.ShowDialog();
+
+                    if (result == true && updateDialog.InstallNow)
+                    {
+                        try
+                        {
+                            Mouse.OverrideCursor = Cursors.Wait;
+
+                            // Download the update
+                            string updateZipPath = await App.UpdateService.DownloadUpdateAsync(e.DownloadUrl);
+
+                            // Prepare the update files
+                            bool prepared = await App.UpdateService.PrepareUpdateAsync(updateZipPath);
+
+                            if (prepared)
+                            {
+                                // Get the extracted path
+                                string extractedPath = Path.Combine(
+                                    Path.Combine(
+                                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                        "AMO_Launcher"),
+                                    "Updates",
+                                    "ExtractedUpdate");
+
+                                // Apply the update - this will launch the updater executable
+                                bool launched = App.UpdateService.ApplyUpdate(extractedPath);
+
+                                if (launched)
+                                {
+                                    // Close this application so the updater can work
+                                    Application.Current.Shutdown();
+                                }
+                                else
+                                {
+                                    MessageBox.Show("Failed to launch the updater. Please try again later.",
+                                        "Update Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                                }
+                            }
+                            else
+                            {
+                                MessageBox.Show("Failed to prepare the update files. Please try again later.",
+                                    "Update Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Mouse.OverrideCursor = null;
+                            MessageBox.Show($"Error during update installation: {ex.Message}",
+                                "Update Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                        finally
+                        {
+                            Mouse.OverrideCursor = null;
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error handling update available: {ex.Message}");
+            }
+        }
+
+        private void UpdateService_UpdateCheckFailed(object sender, Exception e)
+        {
+            App.LogToFile($"Update check failed: {e.Message}");
         }
 
 

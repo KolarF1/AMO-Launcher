@@ -119,23 +119,52 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Left Column - Settings Coming Soon -->
+            <!-- Left Column - Was "Settings coming soon", now "Check for Updates" -->
             <StackPanel Grid.Column="0" Margin="25,15,15,15">
-                <!-- "Settings coming soon" message with icon for general settings -->
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,0">
-                    <iconPacks:PackIconBootstrapIcons Kind="Gear" 
-                                                     Width="48" Height="48"
-                                                     HorizontalAlignment="Center"
-                                                     Foreground="{StaticResource TextSecondaryBrush}" Opacity="0.7"/>
-                    <TextBlock Text="Settings coming soon" 
-                               FontSize="16" FontWeight="Medium"
-                               Foreground="{StaticResource TextBrush}"
-                               Margin="0,16,0,0"
-                               HorizontalAlignment="Center"/>
-                    <TextBlock Text="Configuration options will be added in future updates" 
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               TextWrapping="Wrap" TextAlignment="Center"
-                               Margin="0,8,0,0"/>
+                <!-- Update settings section with the Check for Updates button -->
+                <TextBlock Text="UPDATES" FontSize="12" FontWeight="Bold" 
+               Foreground="{StaticResource AccentBrush}" Margin="0,40,0,6"/>
+
+                <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,20,0,0" Width="300">
+                    <TextBlock Text="Application Updates" 
+                   FontSize="14" FontWeight="Medium"
+                   Foreground="{StaticResource TextBrush}"
+                   Margin="0,0,0,10"/>
+
+                    <Button x:Name="CheckForUpdatesButton" 
+                Content="Check for Updates" 
+                Style="{StaticResource PrimaryButton}"
+                Click="CheckForUpdatesButton_Click"
+                Margin="0,5,0,8"
+                HorizontalAlignment="Left"
+                Width="200"
+                Padding="8,5,8,5">
+                        <Button.ContentTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconBootstrapIcons Kind="CloudDownload" 
+                                                         Width="16" Height="16"
+                                                         VerticalAlignment="Center"
+                                                         Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding}" 
+                           VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </Button.ContentTemplate>
+                    </Button>
+
+                    <TextBlock Text="Check if a new version of AMO Launcher is available. Updates provide new features, bug fixes, and improved compatibility with games."
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   TextWrapping="Wrap" 
+                   Margin="0,5,0,0"
+                   FontSize="11"/>
+
+                    <!-- Added Version TextBlock -->
+                    <TextBlock x:Name="VersionTextBlock" 
+           Text="Current Version: v1.0.0" 
+           Foreground="{StaticResource TextSecondaryBrush}"
+           FontSize="11"
+           Margin="0,8,0,0"/>
                 </StackPanel>
 
                 <!-- Separator -->
@@ -143,69 +172,41 @@
 
                 <!-- Advanced Settings Header -->
                 <TextBlock Text="ADVANCED" FontSize="12" FontWeight="Bold" 
-                           Foreground="{StaticResource AccentBrush}" Margin="0,12,0,6"/>
+               Foreground="{StaticResource AccentBrush}" Margin="0,12,0,6"/>
 
                 <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,20,0,0" Width="300">
                     <TextBlock Text="Game Data Management" 
-                               FontSize="14" FontWeight="Medium"
-                               Foreground="{StaticResource TextBrush}"
-                               Margin="0,0,0,10"/>
+                   FontSize="14" FontWeight="Medium"
+                   Foreground="{StaticResource TextBrush}"
+                   Margin="0,0,0,10"/>
 
                     <Button x:Name="ResetGameDataButton" 
-                            Content="Reset Original GameData" 
-                            Style="{StaticResource PrimaryButton}"
-                            Click="ResetGameDataButton_Click"
-                            Margin="0,5,0,8"
-                            HorizontalAlignment="Left"
-                            Width="200"
-                            Padding="8,5,8,5">
+                Content="Reset Original GameData" 
+                Style="{StaticResource PrimaryButton}"
+                Click="ResetGameDataButton_Click"
+                Margin="0,5,0,8"
+                HorizontalAlignment="Left"
+                Width="200"
+                Padding="8,5,8,5">
                         <Button.ContentTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
                                     <iconPacks:PackIconBootstrapIcons Kind="ArrowCounterclockwise" 
-                                                     Width="16" Height="16"
-                                                     VerticalAlignment="Center"
-                                                     Margin="0,0,8,0"/>
+                                                         Width="16" Height="16"
+                                                         VerticalAlignment="Center"
+                                                         Margin="0,0,8,0"/>
                                     <TextBlock Text="{Binding}" 
-                               VerticalAlignment="Center"/>
+                           VerticalAlignment="Center"/>
                                 </StackPanel>
                             </DataTemplate>
                         </Button.ContentTemplate>
                     </Button>
 
                     <TextBlock Text="Use this option if mods aren't applying correctly or if your game files have been updated. This will recreate the backup of your original game files."
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               TextWrapping="Wrap" 
-                               Margin="0,5,0,0"
-                               FontSize="11"/>
-                </StackPanel>
-            </StackPanel>
-
-            <!-- Right Column -->
-            <StackPanel Grid.Column="1" Margin="15,15,25,15">
-                <!-- Separator - Vertical Line -->
-                <Border Width="1" Background="#333333" Height="430" 
-                        HorizontalAlignment="Left" Margin="-15,0,0,0"/>
-
-                <!-- About Section with some spacing to align with left column -->
-                <TextBlock Text="ABOUT AMO LAUNCHER" Style="{StaticResource SectionHeaderStyle}" 
-                           Margin="0,45,0,0"/>
-                <TextBlock Text="Information about this application" 
-                           Style="{StaticResource SectionDescriptionStyle}"/>
-
-                <!-- About Content -->
-                <StackPanel Margin="0,20,0,0">
-                    <Image Source="pack://application:,,,/Icon.ico" Width="64" Height="64" 
-                           HorizontalAlignment="Left" Margin="0,0,0,12"/>
-
-                    <TextBlock Text="AMO Launcher" FontSize="16" FontWeight="SemiBold" 
-                               Foreground="{StaticResource TextBrush}"/>
-                    <TextBlock x:Name="VersionTextBlock" Text="Version 1.0.0" 
-                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
-                    <TextBlock Text="© 2025 AMO Launcher Team" 
-                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
-                    <TextBlock Text="A mod manager for F1 games." TextWrapping="Wrap"
-                               Foreground="{StaticResource TextBrush}" Margin="0,12,0,0"/>
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   TextWrapping="Wrap" 
+                   Margin="0,5,0,0"
+                   FontSize="11"/>
                 </StackPanel>
             </StackPanel>
         </Grid>

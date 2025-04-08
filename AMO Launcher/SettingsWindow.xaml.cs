@@ -157,6 +157,35 @@ namespace AMO_Launcher.Views
             }
         }
 
+        // Check for Updates button click handler
+        private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                // Disable the button to prevent multiple clicks
+                CheckForUpdatesButton.IsEnabled = false;
+                CheckForUpdatesButton.Content = "Checking...";
+
+                // Call the update service to check for updates
+                await App.UpdateService.CheckForUpdatesAsync(false);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error checking for updates: {ex.Message}",
+                    "Update Check Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+
+                // Re-enable the button
+                CheckForUpdatesButton.IsEnabled = true;
+                CheckForUpdatesButton.Content = "Check for Updates";
+            }
+        }
+
         #endregion
     }
 }

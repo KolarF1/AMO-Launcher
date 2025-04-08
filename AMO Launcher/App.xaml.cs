@@ -15,9 +15,14 @@ namespace AMO_Launcher
         public static ModDetectionService ModDetectionService { get; private set; } = null!;
         public static GameBackupService GameBackupService { get; private set; } = null!;
         public static ProfileService ProfileService { get; private set; } = null!;
+        public static UpdateService UpdateService { get; private set; } = null!;
 
         // Log file for debugging
         private static readonly string LogFilePath;
+
+        // GitHub repository info for updates
+        private const string GITHUB_OWNER = "KolarF1";
+        private const string GITHUB_REPO = "AMO-Launcher";
 
         // Static constructor to initialize the log file path
         static App()
@@ -79,12 +84,28 @@ namespace AMO_Launcher
                 LogToFile("Showing MainWindow");
                 mainWindow.Show();
                 LogToFile("MainWindow shown");
+
+                // Check for updates in the background after startup
+                LogToFile("Checking for updates in the background");
+                CheckForUpdatesAsync(true);
             }
             catch (Exception ex)
             {
                 LogToFile($"FATAL ERROR in OnStartup: {ex}");
                 MessageBox.Show($"Fatal error during startup: {ex.Message}\n\nSee log file in AppData/Roaming/AMO_Launcher for details.",
                     "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void CheckForUpdatesAsync(bool silent)
+        {
+            try
+            {
+                await UpdateService.CheckForUpdatesAsync(silent);
+            }
+            catch (Exception ex)
+            {
+                LogToFile($"Error checking for updates: {ex}");
             }
         }
 
@@ -119,6 +140,10 @@ namespace AMO_Launcher
                 LogToFile("Initializing ProfileService");
                 // Initialize the profile service (after ConfigService)
                 ProfileService = new ProfileService(ConfigService);
+
+                LogToFile("Initializing UpdateService");
+                // Initialize the update service
+                UpdateService = new UpdateService(GITHUB_OWNER, GITHUB_REPO);
 
                 // Load profiles from persistent storage
                 await ProfileService.LoadProfilesAsync();
@@ -186,6 +211,12 @@ namespace AMO_Launcher
                 {
                     LogToFile("Creating fallback ProfileService");
                     ProfileService = new ProfileService(ConfigService);
+                }
+
+                if (UpdateService == null)
+                {
+                    LogToFile("Creating fallback UpdateService");
+                    UpdateService = new UpdateService(GITHUB_OWNER, GITHUB_REPO);
                 }
             }
         }
