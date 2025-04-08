@@ -1,20 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace AMO_Launcher.Models
 {
     public class ModProfile
     {
         // Unique identifier for the profile
+        [JsonPropertyName("id")]
         public string Id { get; set; } = Guid.NewGuid().ToString();
 
         // Profile display name
+        [JsonPropertyName("name")]
         public string Name { get; set; } = "Default Profile";
 
-        // Add this property to fix the error
+        // Ensure LastModified is serialized/deserialized correctly
+        [JsonPropertyName("lastModified")]
         public DateTime LastModified { get; set; } = DateTime.Now;
 
-        // List of mods
+        // List of mods - ensure proper serialization
+        [JsonPropertyName("appliedMods")]
         public List<AppliedModSetting> AppliedMods { get; set; } = new List<AppliedModSetting>();
 
         // Default constructor
