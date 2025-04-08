@@ -1025,6 +1025,7 @@
 
                 <!-- Pink: Mod Profile Dropdown with fixed width and long name test item -->
                 <ComboBox x:Name="ProfileComboBox" Grid.Column="0" Style="{StaticResource ProfileDropdownStyle}" 
+          SelectionChanged="ProfileComboBox_SelectionChanged"
           Height="25.96" Margin="9,11,0,11" VerticalContentAlignment="Center" Width="128"/>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,7,155,7" Grid.ColumnSpan="2">

@@ -634,26 +634,24 @@ namespace AMO_Launcher.Services
                     App.LogToFile($"  - {id}");
                 }
 
-                // IMPORTANT: Check for exact ID match first
-                if (_currentSettings.GameProfiles.TryGetValue(gameId, out var profiles))
+                // Find the active profile
+                if (!_currentSettings.GameProfiles.TryGetValue(gameId, out var profiles))
                 {
-                    App.LogToFile($"Found {profiles.Count} profiles with exact ID match for {gameId}");
-                    return profiles;
-                }
+                    // Enhanced fuzzy matching - try just the game name
+                    string gameName = gameId.Split('_')[0];
 
-                // If no exact match, try fuzzy match by game name
-                string gameName = gameId.Split('_')[0]; // Extract name part (e.g., "F1 24")
-                foreach (var entry in _currentSettings.GameProfiles)
-                {
-                    if (entry.Key.StartsWith(gameName + "_") || entry.Key == gameName)
+                    // Try to find any key that starts with the game name
+                    var matchingKey = _currentSettings.GameProfiles.Keys
+                        .FirstOrDefault(k => k.StartsWith(gameName, StringComparison.OrdinalIgnoreCase));
+
+                    if (matchingKey != null)
                     {
-                        App.LogToFile($"Found profiles using fuzzy match: {entry.Key}");
+                        App.LogToFile($"Found profiles using loose match: {matchingKey}");
+                        profiles = _currentSettings.GameProfiles[matchingKey];
 
-                        // IMPORTANT: Save these profiles with the new ID to avoid future mismatches
-                        _currentSettings.GameProfiles[gameId] = entry.Value;
+                        // Store with new ID to avoid future mismatches
+                        _currentSettings.GameProfiles[gameId] = profiles;
                         await SaveSettingsAsync();
-
-                        return entry.Value;
                     }
                 }
 

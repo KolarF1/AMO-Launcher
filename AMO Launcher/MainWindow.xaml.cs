@@ -2613,6 +2613,8 @@ namespace AMO_Launcher
             {
                 App.LogToFile("Initializing profile UI components");
 
+                // Wire up profile combobox selection changed event
+                ProfileComboBox.SelectionChanged += ProfileComboBox_SelectionChanged;
                 // Wire up the New Profile button
                 if (NewProfileButton != null)
                 {
@@ -3237,6 +3239,9 @@ namespace AMO_Launcher
                 // Show or hide ListView based on whether we have applied mods
                 Dispatcher.Invoke(() => {
                     AppliedModsListView.Visibility = _appliedMods.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+                    // Explicitly refresh the ListView
+                    AppliedModsListView.Items.Refresh();
                 });
 
                 // Update mod priorities and conflicts

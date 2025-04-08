@@ -659,6 +659,20 @@ namespace AMO_Launcher.Services
             {
                 App.LogToFile("Loading profiles from persistent storage");
 
+                // NEW: Log the actual content of the settings file
+                string settingsPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AMO_Launcher", "settings.json");
+                if (File.Exists(settingsPath))
+                {
+                    string settingsContent = await File.ReadAllTextAsync(settingsPath);
+                    App.LogToFile($"Settings file content: {settingsContent.Substring(0, Math.Min(500, settingsContent.Length))}...");
+                }
+                else
+                {
+                    App.LogToFile("Settings file does not exist yet");
+                }
+
                 // Clear existing data
                 _gameProfiles.Clear();
                 _activeProfileIds.Clear();
@@ -716,8 +730,8 @@ namespace AMO_Launcher.Services
                     }
                     catch (Exception ex)
                     {
-                        App.LogToFile($"Error loading profiles for game {gameId}: {ex.Message}");
-                        // Continue with next game ID
+                        App.LogToFile($"Error loading profiles: {ex.Message}");
+                        App.LogToFile($"Stack trace: {ex.StackTrace}");
                     }
                 }
 
