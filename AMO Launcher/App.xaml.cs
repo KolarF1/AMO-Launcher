@@ -67,7 +67,7 @@ namespace AMO_Launcher
             LogToFile("Application starting");
         }
 
-        protected override void OnStartup(StartupEventArgs e)
+        protected override async void OnStartup(StartupEventArgs e)
         {
             try
             {
@@ -78,6 +78,13 @@ namespace AMO_Launcher
                 InitializeServices();
                 LogToFile("Services initialized");
 
+                // Load settings
+                await ConfigService.LoadSettingsAsync();
+                LogToFile("Settings loaded");
+
+                // Apply low usage mode settings if enabled
+                ApplyLowUsageMode();
+
                 // Create and show the main window
                 LogToFile("Creating MainWindow");
                 var mainWindow = new MainWindow();
@@ -85,9 +92,16 @@ namespace AMO_Launcher
                 mainWindow.Show();
                 LogToFile("MainWindow shown");
 
-                // Check for updates in the background after startup
-                LogToFile("Checking for updates in the background");
-                CheckForUpdatesAsync(true);
+                // Check for updates in the background after startup based on settings
+                if (ConfigService.GetAutoCheckForUpdatesAtStartup())
+                {
+                    LogToFile("Auto-checking for updates in the background");
+                    CheckForUpdatesAsync(true);
+                }
+                else
+                {
+                    LogToFile("Auto-updates disabled, skipping update check");
+                }
             }
             catch (Exception ex)
             {
@@ -221,11 +235,50 @@ namespace AMO_Launcher
             }
         }
 
+        // Apply Low Usage Mode settings
+        private void ApplyLowUsageMode()
+        {
+            if (ConfigService.GetLowUsageMode())
+            {
+                LogToFile("Applying Low Usage Mode settings");
+
+                // Set GC settings to minimize memory usage
+                GC.Collect(2, GCCollectionMode.Forced, true, true);
+
+                // Reduce the timer interval for background tasks if applicable
+                // Example (you may need to modify this based on your actual implementation):
+                /*
+                if (_updateCheckTimer != null)
+                {
+                    _updateCheckTimer.Interval = TimeSpan.FromMinutes(60).TotalMilliseconds; // Reduce check frequency
+                }
+                */
+
+                // Disable animations if applicable
+                // Example:
+                /*
+                if (Current.Resources.Contains("EnableAnimations"))
+                {
+                    Current.Resources["EnableAnimations"] = false;
+                }
+                */
+
+                // Set rendering tier to lower quality
+                System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+            }
+        }
+
         // Log to a file in AppData/Roaming/AMO_Launcher folder
-        public static void LogToFile(string message)
+        public static void LogToFile(string message, bool isDetailedLog = false)
         {
             try
             {
+                // Skip detailed logs if detailed logging is not enabled
+                if (isDetailedLog && ConfigService != null && !ConfigService.GetEnableDetailedLogging())
+                {
+                    return;
+                }
+
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
                 string logMessage = $"[{timestamp}] {message}";
                 File.AppendAllText(LogFilePath, logMessage + Environment.NewLine);
@@ -234,6 +287,12 @@ namespace AMO_Launcher
             {
                 // Ignore logging errors
             }
+        }
+
+        // Overload for detailed logging
+        public static void LogDetailedToFile(string message)
+        {
+            LogToFile(message, true);
         }
 
         // Handle unhandled exceptions to prevent crashes

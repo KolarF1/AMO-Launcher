@@ -820,19 +820,224 @@ namespace AMO_Launcher.Services
 
             return _currentSettings;
         }
+
+        // Get auto-detect games at startup setting
+        public bool GetAutoDetectGamesAtStartup()
+        {
+            return _currentSettings.AutoDetectGamesAtStartup;
+        }
+
+        // Set auto-detect games at startup setting
+        public void SetAutoDetectGamesAtStartup(bool value)
+        {
+            _currentSettings.AutoDetectGamesAtStartup = value;
+        }
+
+        // Get auto-check for updates at startup setting
+        public bool GetAutoCheckForUpdatesAtStartup()
+        {
+            return _currentSettings.AutoCheckForUpdatesAtStartup;
+        }
+
+        // Set auto-check for updates at startup setting
+        public void SetAutoCheckForUpdatesAtStartup(bool value)
+        {
+            _currentSettings.AutoCheckForUpdatesAtStartup = value;
+        }
+
+        // Get detailed logging setting
+        public bool GetEnableDetailedLogging()
+        {
+            return _currentSettings.EnableDetailedLogging;
+        }
+
+        // Set detailed logging setting
+        public void SetEnableDetailedLogging(bool value)
+        {
+            _currentSettings.EnableDetailedLogging = value;
+        }
+
+        // Get low usage mode setting
+        public bool GetLowUsageMode()
+        {
+            return _currentSettings.LowUsageMode;
+        }
+
+        // Set low usage mode setting
+        public void SetLowUsageMode(bool value)
+        {
+            _currentSettings.LowUsageMode = value;
+        }
+
+        // Get remember last selected game setting
+        public bool GetRememberLastSelectedGame()
+        {
+            return _currentSettings.RememberLastSelectedGame;
+        }
+
+        // Set remember last selected game setting
+        public void SetRememberLastSelectedGame(bool value)
+        {
+            _currentSettings.RememberLastSelectedGame = value;
+        }
+
+        // Get launcher action on game launch
+        public string GetLauncherActionOnGameLaunch()
+        {
+            return _currentSettings.LauncherActionOnGameLaunch ?? "Minimize";
+        }
+
+        // Set launcher action on game launch
+        public void SetLauncherActionOnGameLaunch(string value)
+        {
+            _currentSettings.LauncherActionOnGameLaunch = value;
+        }
+
+        // Get custom game scan paths
+        public List<string> GetCustomGameScanPaths()
+        {
+            return _currentSettings.CustomGameScanPaths ?? new List<string>();
+        }
+
+        // Add custom game scan path
+        public void AddCustomGameScanPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            _currentSettings.CustomGameScanPaths = _currentSettings.CustomGameScanPaths ?? new List<string>();
+
+            // Don't add duplicates
+            if (!_currentSettings.CustomGameScanPaths.Contains(path))
+            {
+                _currentSettings.CustomGameScanPaths.Add(path);
+            }
+        }
+
+        // Remove custom game scan path
+        public void RemoveCustomGameScanPath(string path)
+        {
+            if (string.IsNullOrEmpty(path) || _currentSettings.CustomGameScanPaths == null)
+                return;
+
+            _currentSettings.CustomGameScanPaths.Remove(path);
+        }
+
+        // Clear all custom game scan paths
+        public void ClearCustomGameScanPaths()
+        {
+            _currentSettings.CustomGameScanPaths = new List<string>();
+        }
+
+        // Reset to default settings
+        public async Task ResetToDefaultSettingsAsync()
+        {
+            // Save existing Games and GameProfiles data
+            var existingGames = _currentSettings.Games;
+            var existingProfiles = _currentSettings.GameProfiles;
+            var existingRemovedPaths = _currentSettings.RemovedGamePaths;
+
+            // Create a new settings object with defaults
+            _currentSettings = new AppSettings
+            {
+                Games = existingGames, // Keep game data
+                GameProfiles = existingProfiles, // Keep profiles data
+                RemovedGamePaths = existingRemovedPaths, // Keep removed paths
+                AutoDetectGamesAtStartup = true,
+                AutoCheckForUpdatesAtStartup = true,
+                EnableDetailedLogging = false,
+                LowUsageMode = false,
+                RememberLastSelectedGame = false, // Changed default to match new requirement
+                LauncherActionOnGameLaunch = "Minimize",
+                CustomGameScanPaths = new List<string>()
+            };
+
+            // Save the reset settings
+            await SaveSettingsAsync();
+        }
+
+        // Clear cache directories
+        public void ClearCache()
+        {
+            try
+            {
+                string appDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AMO_Launcher");
+
+                // Clear icon cache
+                string iconCachePath = Path.Combine(appDataPath, "IconCache");
+                if (Directory.Exists(iconCachePath))
+                {
+                    foreach (var file in Directory.GetFiles(iconCachePath))
+                    {
+                        try
+                        {
+                            File.Delete(file);
+                        }
+                        catch (Exception ex)
+                        {
+                            App.LogToFile($"Error deleting cache file {file}: {ex.Message}");
+                        }
+                    }
+                }
+
+                // Clear update files
+                string updatePath = Path.Combine(appDataPath, "Updates");
+                if (Directory.Exists(updatePath))
+                {
+                    try
+                    {
+                        Directory.Delete(updatePath, true);
+                        Directory.CreateDirectory(updatePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        App.LogToFile($"Error clearing update cache: {ex.Message}");
+                    }
+                }
+
+                // Reset icon cache service
+                App.IconCacheService.ClearCache();
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error clearing cache: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Get the default game ID
+        public string GetDefaultGameId()
+        {
+            return _currentSettings.DefaultGameId;
+        }
+
+        // Get the last selected game ID
+        public string GetLastSelectedGameId()
+        {
+            return _currentSettings.LastGameId;
+        }
     }
 
     // Classes for serialization
     public class AppSettings
     {
         public List<GameSetting> Games { get; set; }
-        public List<string> RemovedGamePaths { get; set; } = new List<string>(); // Track removed game paths
+        public List<string> RemovedGamePaths { get; set; } = new List<string>();
         public string DefaultGameId { get; set; }
         public string LastGameId { get; set; }
         public Dictionary<string, List<AppliedModSetting>> AppliedMods { get; set; } = new Dictionary<string, List<AppliedModSetting>>();
         public Dictionary<string, List<AppliedModSetting>> LastAppliedMods { get; set; } = new Dictionary<string, List<AppliedModSetting>>();
         public Dictionary<string, List<ModProfile>> GameProfiles { get; set; } = new Dictionary<string, List<ModProfile>>();
         public Dictionary<string, string> ActiveProfileIds { get; set; } = new Dictionary<string, string>();
+        public bool AutoDetectGamesAtStartup { get; set; } = true;
+        public bool AutoCheckForUpdatesAtStartup { get; set; } = true;
+        public bool EnableDetailedLogging { get; set; } = false;
+        public bool LowUsageMode { get; set; } = false;
+        public bool RememberLastSelectedGame { get; set; } = false; // Changed from true to false
+        public List<string> CustomGameScanPaths { get; set; } = new List<string>();
+        public string LauncherActionOnGameLaunch { get; set; } = "Minimize"; // Options: None, Minimize, Close
     }
 
     public class GameSetting

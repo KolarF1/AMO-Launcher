@@ -560,9 +560,12 @@ namespace AMO_Launcher.Views
             {
                 SelectedGame = selectedGame;
 
-                // Save this as the last selected game
-                _configService.SetLastSelectedGame(selectedGame.Id);
-                await _configService.SaveSettingsAsync();
+                // Only save as last selected if the setting is enabled
+                if (_configService.GetRememberLastSelectedGame())
+                {
+                    _configService.SetLastSelectedGame(selectedGame.Id);
+                    await _configService.SaveSettingsAsync();
+                }
 
                 DialogResult = true;
                 Close();

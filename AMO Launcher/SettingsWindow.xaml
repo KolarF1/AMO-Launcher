@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
         mc:Ignorable="d"
-        Title="Settings" Height="560" Width="700"
+        Title="Settings" Height="620" Width="800"
         WindowStartupLocation="CenterOwner" 
         Background="{StaticResource GeometricBackground}"
         WindowStyle="None" 
@@ -81,6 +81,231 @@
             <Setter Property="Margin" Value="0,2,0,6"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
+
+        <!-- Toggle Switch Style -->
+        <Style x:Key="ToggleSwitchStyle">
+            <Setter Property="Control.Margin" Value="0,4,0,4" />
+        </Style>
+
+        <!-- Separator Style -->
+        <Style x:Key="SettingsSeparator" TargetType="Border">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Background" Value="#333333"/>
+            <Setter Property="Margin" Value="0,20,0,10"/>
+        </Style>
+
+        <Style x:Key="SettingsCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4,0,0,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid x:Name="templateRoot" Background="Transparent" SnapsToDevicePixels="True">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="checkBoxBorder" 
+                            Background="Transparent" 
+                            BorderBrush="#666666" 
+                            BorderThickness="1"
+                            HorizontalAlignment="Left" 
+                            Margin="1" 
+                            VerticalAlignment="Center"
+                            Width="16" 
+                            Height="16">
+                                <Grid x:Name="markGrid">
+                                    <Path x:Name="optionMark" 
+                                  Data="M0,6 L2,4 L6,8 L14,0 L16,2 L6,12 z" 
+                                  Fill="{StaticResource AMOGoldGradient}" 
+                                  Margin="1"
+                                  Opacity="0" 
+                                  Stretch="None" 
+                                  VerticalAlignment="Center"
+                                  HorizontalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <!-- Remove the Foreground property from ContentPresenter -->
+                            <ContentPresenter x:Name="contentPresenter" 
+                                     ContentTemplate="{TemplateBinding ContentTemplate}" 
+                                     Content="{TemplateBinding Content}" 
+                                     Grid.Column="1" 
+                                     Focusable="False" 
+                                     HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                     Margin="{TemplateBinding Padding}" 
+                                     RecognizesAccessKey="True" 
+                                     SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" 
+                                     VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasContent" Value="True">
+                                <Setter Property="Padding" Value="4,0,0,0"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" TargetName="checkBoxBorder" Value="{StaticResource AMOGoldGradient}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Opacity" TargetName="optionMark" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="{x:Null}">
+                                <Setter Property="Opacity" TargetName="optionMark" Value="0.56"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LauncherActionComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="8,4,8,4"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="border" 
+                    Background="{TemplateBinding Background}" 
+                    BorderBrush="{TemplateBinding BorderBrush}" 
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="3">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Explicitly set Foreground to ensure text visibility -->
+                                    <TextBlock Grid.Column="0"
+                                       x:Name="ContentSite" 
+                                       Text="{Binding SelectedItem.Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" 
+                                       Margin="6,0,6,0"
+                                       MinWidth="50"
+                                       TextAlignment="Left"
+                                       Foreground="Black"/>
+
+                                    <!-- Dropdown Arrow -->
+                                    <iconPacks:PackIconBootstrapIcons Grid.Column="1" 
+                                                     Kind="ChevronDown" 
+                                                     Width="12" Height="12" 
+                                                     VerticalAlignment="Center"
+                                                     Foreground="Black"
+                                                     Margin="8,0,8,0"/>
+
+                                    <!-- Transparent ToggleButton for capturing clicks -->
+                                    <ToggleButton Grid.ColumnSpan="2" 
+                                 x:Name="ToggleButton"
+                                 Focusable="false"
+                                 IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                </Grid>
+                            </Border>
+
+                            <!-- Popup for dropdown items -->
+                            <Popup x:Name="Popup" 
+                  IsOpen="{TemplateBinding IsDropDownOpen}" 
+                  Placement="Bottom"
+                  Focusable="False" 
+                  AllowsTransparency="True" 
+                  PopupAnimation="Slide">
+                                <Border x:Name="PopupBorder" 
+                       Background="#222222" 
+                       BorderBrush="#444444" 
+                       BorderThickness="1"
+                       CornerRadius="0,0,3,3"
+                       Width="{TemplateBinding ActualWidth}"
+                       MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <ScrollViewer SnapsToDevicePixels="True" 
+                                x:Name="ScrollViewer" 
+                                Margin="0,4,0,4" 
+                                BorderThickness="0"
+                                HorizontalScrollBarVisibility="Disabled">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect ShadowDepth="0" BlurRadius="5" Color="Gold" Opacity="0.6"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+
+            <!-- Item Container Style (for ComboBoxItems) -->
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="OverridesDefaultStyle" Value="True"/>
+                        <Setter Property="SnapsToDevicePixels" Value="True"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="MinHeight" Value="25"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="Bd"
+                                   Background="Transparent"
+                                   BorderThickness="0"
+                                   Padding="8,6"
+                                   Margin="2,0,2,0">
+                                        <TextBlock x:Name="Tb" 
+                                          Text="{TemplateBinding Content}" 
+                                          TextTrimming="CharacterEllipsis"
+                                          Margin="4,0,4,0"
+                                          VerticalAlignment="Center"
+                                          Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                        </Trigger>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource AMOGoldGradient}"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -112,108 +337,402 @@
             </StackPanel>
         </Grid>
 
-        <!-- Main Content - No ScrollViewer -->
-        <Grid Grid.Row="1" Background="{StaticResource SecondaryBrush}" Margin="10,0,10,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- Main Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Background="{StaticResource SecondaryBrush}" Margin="10,0,10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-            <!-- Left Column - Was "Settings coming soon", now "Check for Updates" -->
-            <StackPanel Grid.Column="0" Margin="25,15,15,15">
-                <!-- Update settings section with the Check for Updates button -->
-                <TextBlock Text="UPDATES" FontSize="12" FontWeight="Bold" 
-               Foreground="{StaticResource AccentBrush}" Margin="0,40,0,6"/>
+                <!-- Left Column -->
+                <StackPanel Grid.Column="0" Margin="25,15,15,15">
+                    <!-- General Settings Section -->
+                    <TextBlock Text="GENERAL SETTINGS" FontSize="12" FontWeight="Bold" 
+           Foreground="{StaticResource AccentBrush}" Margin="0,10,0,15"/>
 
-                <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,20,0,0" Width="300">
-                    <TextBlock Text="Application Updates" 
-                   FontSize="14" FontWeight="Medium"
-                   Foreground="{StaticResource TextBrush}"
-                   Margin="0,0,0,10"/>
-
-                    <Button x:Name="CheckForUpdatesButton" 
-                Content="Check for Updates" 
-                Style="{StaticResource PrimaryButton}"
-                Click="CheckForUpdatesButton_Click"
-                Margin="0,5,0,8"
-                HorizontalAlignment="Left"
-                Width="200"
-                Padding="8,5,8,5">
-                        <Button.ContentTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <iconPacks:PackIconBootstrapIcons Kind="CloudDownload" 
-                                                         Width="16" Height="16"
-                                                         VerticalAlignment="Center"
-                                                         Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding}" 
-                           VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </Button.ContentTemplate>
-                    </Button>
-
-                    <TextBlock Text="Check if a new version of AMO Launcher is available. Updates provide new features, bug fixes, and improved compatibility with games."
-                   Foreground="{StaticResource TextSecondaryBrush}"
-                   TextWrapping="Wrap" 
-                   Margin="0,5,0,0"
-                   FontSize="11"/>
-
-                    <!-- Added Version TextBlock -->
-                    <TextBlock x:Name="VersionTextBlock" 
-           Text="Current Version: v1.0.0" 
+                    <!-- Auto-detect games toggle with explicit style -->
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                        <CheckBox x:Name="AutoDetectGamesCheckBox" 
+              Content="Auto-detect games at startup" 
+              Style="{StaticResource SettingsCheckBoxStyle}"
+              Checked="SettingCheckBox_CheckedChanged"
+              Unchecked="SettingCheckBox_CheckedChanged"
+              IsChecked="True"/>
+                    </StackPanel>
+                    <TextBlock Text="Automatically scan for installed games when starting the launcher."
            Foreground="{StaticResource TextSecondaryBrush}"
-           FontSize="11"
-           Margin="0,8,0,0"/>
+           TextWrapping="Wrap" 
+           Margin="20,0,0,15"
+           FontSize="11"/>
+
+                    <!-- Remember last selected game toggle with explicit style -->
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                        <CheckBox x:Name="RememberLastGameCheckBox" 
+              Content="Remember last selected game" 
+              Style="{StaticResource SettingsCheckBoxStyle}"
+              Checked="SettingCheckBox_CheckedChanged"
+              Unchecked="SettingCheckBox_CheckedChanged"
+              IsChecked="False"/>
+                    </StackPanel>
+                    <TextBlock Text="Remember and automatically select the last game you used. When enabled, this overrides the default game setting."
+           Foreground="{StaticResource TextSecondaryBrush}"
+           TextWrapping="Wrap" 
+           Margin="20,0,0,15"
+           FontSize="11"/>
+
+                    <!-- Launcher behavior on game launch with custom style -->
+                    <TextBlock Text="When Game Launches:" 
+           Foreground="White"
+           FontWeight="Medium"
+           Margin="0,10,0,8"/>
+                    <ComboBox x:Name="LauncherActionComboBox" 
+          Width="200" 
+          HorizontalAlignment="Left"
+          SelectionChanged="LauncherActionComboBox_SelectionChanged"
+          Style="{StaticResource LauncherActionComboBoxStyle}"
+          Margin="0,0,0,15">
+                        <ComboBoxItem Content="Do Nothing"/>
+                        <ComboBoxItem Content="Minimize Launcher" IsSelected="True"/>
+                        <ComboBoxItem Content="Close Launcher"/>
+                    </ComboBox>
+
+                    <!-- Custom game scan paths -->
+                    <TextBlock Text="Custom Game Scan Paths" 
+           Foreground="{StaticResource TextBrush}"
+           FontWeight="Medium"
+           Margin="0,10,0,8"/>
+                    <TextBlock Text="Add additional folders to scan for games"
+           Foreground="{StaticResource TextSecondaryBrush}"
+           TextWrapping="Wrap" 
+           Margin="0,0,0,8"
+           FontSize="11"/>
+
+                    <ListBox x:Name="CustomPathsListBox" 
+                             Height="100" 
+                             BorderThickness="1"
+                             BorderBrush="#333333"
+                             Background="{StaticResource PrimaryBrush}" Foreground="White"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Button x:Name="AddPathButton" 
+                                Content="Add Path" 
+                                Style="{StaticResource ActionButton}"
+                                Click="AddPathButton_Click"
+                                Width="80"
+                                Margin="0,0,5,0" Padding="11,8,11,8" Height="34.62"/>
+                        <Button x:Name="RemovePathButton" 
+                                Content="Remove" 
+                                Style="{StaticResource ActionButton}"
+                                Click="RemovePathButton_Click"
+                                Width="80"/>
+                    </StackPanel>
+
+                    <!-- Separator -->
+                    <Border Style="{StaticResource SettingsSeparator}"/>
+
+                    <!-- Advanced Settings Header -->
+                    <TextBlock Text="ADVANCED" FontSize="12" FontWeight="Bold" 
+           Foreground="{StaticResource AccentBrush}" Margin="0,15,0,15"/>
+
+                    <!-- Game Data Management -->
+                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,0,0,0" Width="300">
+                        <TextBlock Text="Game Data Management" 
+               FontSize="14" FontWeight="Medium"
+               Foreground="{StaticResource TextBrush}"
+               Margin="0,0,0,10"/>
+
+                        <Button x:Name="ResetGameDataButton" 
+            Content="Reset Original GameData" 
+            Style="{StaticResource PrimaryButton}"
+            Click="ResetGameDataButton_Click"
+            Margin="0,5,0,8"
+            HorizontalAlignment="Left"
+            Width="200"
+            Padding="8,5,8,5">
+                            <Button.ContentTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <iconPacks:PackIconBootstrapIcons Kind="ArrowCounterclockwise" 
+                                         Width="16" Height="16"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding}" 
+                               VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </Button.ContentTemplate>
+                        </Button>
+
+                        <TextBlock Text="Use this option if mods aren't applying correctly or if your game files have been updated. This will recreate the backup of your original game files."
+               Foreground="{StaticResource TextSecondaryBrush}"
+               TextWrapping="Wrap" 
+               Margin="0,5,0,20"
+               FontSize="11"/>
+
+                        <!-- Cache Management -->
+                        <TextBlock Text="Cache Management" 
+               FontSize="14" FontWeight="Medium"
+               Foreground="{StaticResource TextBrush}"
+               Margin="0,0,0,10"/>
+
+                        <Button x:Name="ClearCacheButton" 
+            Content="Clear Cache" 
+            Style="{StaticResource ActionButton}"
+            Click="ClearCacheButton_Click"
+            Margin="0,5,0,8"
+            HorizontalAlignment="Left"
+            Width="200"
+            Padding="8,5,8,5">
+                            <Button.ContentTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <iconPacks:PackIconBootstrapIcons Kind="Trash" 
+                                         Width="16" Height="16"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding}" 
+                               VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </Button.ContentTemplate>
+                        </Button>
+
+                        <TextBlock Text="Clears temporary files, icon cache, and update files."
+               Foreground="{StaticResource TextSecondaryBrush}"
+               TextWrapping="Wrap" 
+               Margin="0,5,0,0"
+               FontSize="11"/>
+                    </StackPanel>
                 </StackPanel>
 
-                <!-- Separator -->
-                <Border Height="1" Background="#333333" Margin="0,40,0,0"/>
+                <!-- Right Column -->
+                <StackPanel Grid.Column="1" Margin="15,15,25,15">
+                    <!-- Updates section -->
+                    <TextBlock Text="UPDATES" FontSize="12" FontWeight="Bold" 
+                               Foreground="{StaticResource AccentBrush}" Margin="0,10,0,15"/>
 
-                <!-- Advanced Settings Header -->
-                <TextBlock Text="ADVANCED" FontSize="12" FontWeight="Bold" 
-               Foreground="{StaticResource AccentBrush}" Margin="0,12,0,6"/>
+                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,0,0,0" Width="300">
+                        <!-- Auto check for updates toggle with explicit style -->
+                        <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                            <CheckBox x:Name="AutoCheckUpdatesCheckBox" 
+              Content="Auto-check for updates at startup" 
+              Style="{StaticResource SettingsCheckBoxStyle}"
+              Checked="SettingCheckBox_CheckedChanged"
+              Unchecked="SettingCheckBox_CheckedChanged"
+              IsChecked="True"/>
+                        </StackPanel>
+                        <TextBlock Text="Automatically check for launcher updates when starting the application."
+           Foreground="{StaticResource TextSecondaryBrush}"
+           TextWrapping="Wrap" 
+           Margin="20,0,0,15"
+           FontSize="11"/>
 
-                <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,20,0,0" Width="300">
-                    <TextBlock Text="Game Data Management" 
-                   FontSize="14" FontWeight="Medium"
-                   Foreground="{StaticResource TextBrush}"
-                   Margin="0,0,0,10"/>
+                        <TextBlock Text="Application Updates" 
+                                   FontSize="14" FontWeight="Medium"
+                                   Foreground="{StaticResource TextBrush}"
+                                   Margin="0,0,0,10"/>
 
-                    <Button x:Name="ResetGameDataButton" 
-                Content="Reset Original GameData" 
-                Style="{StaticResource PrimaryButton}"
-                Click="ResetGameDataButton_Click"
-                Margin="0,5,0,8"
-                HorizontalAlignment="Left"
-                Width="200"
-                Padding="8,5,8,5">
+                        <Button x:Name="CheckForUpdatesButton" 
+                                Content="Check for Updates" 
+                                Style="{StaticResource PrimaryButton}"
+                                Click="CheckForUpdatesButton_Click"
+                                Margin="0,5,0,8"
+                                HorizontalAlignment="Left"
+                                Width="200"
+                                Padding="8,5,8,5">
+                            <Button.ContentTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <iconPacks:PackIconBootstrapIcons Kind="CloudDownload" 
+                                                                 Width="16" Height="16"
+                                                                 VerticalAlignment="Center"
+                                                                 Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding}" 
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </Button.ContentTemplate>
+                        </Button>
+
+                        <TextBlock Text="Check if a new version of AMO Launcher is available. Updates provide new features, bug fixes, and improved compatibility with games."
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" 
+                                   Margin="0,5,0,0"
+                                   FontSize="11"/>
+
+                        <!-- Added Version TextBlock -->
+                        <TextBlock x:Name="VersionTextBlock" 
+                                   Text="Current Version: v1.0.0" 
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontSize="11"
+                                   Margin="0,8,0,0"/>
+                    </StackPanel>
+
+                    <!-- Separator -->
+                    <Border Style="{StaticResource SettingsSeparator}"/>
+
+                    <!-- Performance Settings -->
+                    <TextBlock Text="PERFORMANCE" FontSize="12" FontWeight="Bold" 
+                               Foreground="{StaticResource AccentBrush}" Margin="0,5,0,15"/>
+
+                    <!-- Low Usage Mode toggle with explicit style -->
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                        <CheckBox x:Name="LowUsageModeCheckBox" 
+              Content="Low Usage Mode" 
+              Style="{StaticResource SettingsCheckBoxStyle}"
+              Checked="SettingCheckBox_CheckedChanged"
+              Unchecked="SettingCheckBox_CheckedChanged"
+              IsChecked="False"/>
+                    </StackPanel>
+                    <TextBlock Text="Reduces memory usage and background operations. Recommended for older systems."
+           Foreground="{StaticResource TextSecondaryBrush}"
+           TextWrapping="Wrap" 
+           Margin="20,0,0,15"
+           FontSize="11"/>
+
+                    <!-- Detailed Logging toggle with explicit style -->
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                        <CheckBox x:Name="DetailedLoggingCheckBox" 
+              Content="Enable Detailed Logging" 
+              Style="{StaticResource SettingsCheckBoxStyle}"
+              Checked="SettingCheckBox_CheckedChanged"
+              Unchecked="SettingCheckBox_CheckedChanged"
+              IsChecked="False"/>
+                    </StackPanel>
+                    <TextBlock Text="Logs additional information for troubleshooting. May slightly reduce performance."
+           Foreground="{StaticResource TextSecondaryBrush}"
+           TextWrapping="Wrap" 
+           Margin="20,0,0,15"
+           FontSize="11"/>
+
+                    <!-- Separator -->
+                    <Border Style="{StaticResource SettingsSeparator}"/>
+
+                    <!-- About Section -->
+                    <TextBlock Text="ABOUT" FontSize="12" FontWeight="Bold" 
+                               Foreground="{StaticResource AccentBrush}" Margin="0,5,0,15"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="AMO Launcher" 
+                                   Foreground="{StaticResource TextBrush}"
+                                   FontWeight="Bold"
+                                   FontSize="14"/>
+                        <TextBlock x:Name="AboutVersionTextBlock" 
+                                   Text=" v1.0.0" 
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontSize="12"
+                                   VerticalAlignment="Bottom"
+                                   Margin="5,0,0,1"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Advanced Mod Organizer for Formula One Games"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" 
+                               Margin="0,0,0,15"
+                               FontSize="12"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <Button x:Name="DiscordButton" 
+                                Content="Join Discord" 
+                                Style="{StaticResource ActionButton}"
+                                Click="DiscordButton_Click"
+                                Margin="0,0,5,0"
+                                Padding="8,5,8,5" Height="48.62">
+                            <Button.ContentTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <iconPacks:PackIconBootstrapIcons Kind="Discord" 
+                                                                 Width="16" Height="16"
+                                                                 VerticalAlignment="Center"
+                                                                 Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding}" 
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </Button.ContentTemplate>
+                        </Button>
+
+                        <Button x:Name="HelpButton" 
+                                Content="Help" 
+                                Style="{StaticResource ActionButton}"
+                                Click="HelpButton_Click"
+                                Padding="8,5,8,5" Height="48.62">
+                            <Button.ContentTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <iconPacks:PackIconBootstrapIcons Kind="QuestionCircle" 
+                                                                 Width="16" Height="16"
+                                                                 VerticalAlignment="Center"
+                                                                 Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding}" 
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </Button.ContentTemplate>
+                        </Button>
+                    </StackPanel>
+
+                    <Button x:Name="OpenSettingsFolderButton" 
+                            Content="Open Settings Folder" 
+                            Style="{StaticResource ActionButton}"
+                            Click="OpenSettingsFolderButton_Click"
+                            HorizontalAlignment="Left"
+                            Margin="0,10,0,0"
+                            Padding="8,5,8,5">
                         <Button.ContentTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
-                                    <iconPacks:PackIconBootstrapIcons Kind="ArrowCounterclockwise" 
-                                                         Width="16" Height="16"
-                                                         VerticalAlignment="Center"
-                                                         Margin="0,0,8,0"/>
+                                    <iconPacks:PackIconBootstrapIcons Kind="Folder" 
+                                                             Width="16" Height="16"
+                                                             VerticalAlignment="Center"
+                                                             Margin="0,0,8,0"/>
                                     <TextBlock Text="{Binding}" 
-                           VerticalAlignment="Center"/>
+                                               VerticalAlignment="Center"/>
                                 </StackPanel>
                             </DataTemplate>
                         </Button.ContentTemplate>
                     </Button>
 
-                    <TextBlock Text="Use this option if mods aren't applying correctly or if your game files have been updated. This will recreate the backup of your original game files."
-                   Foreground="{StaticResource TextSecondaryBrush}"
-                   TextWrapping="Wrap" 
-                   Margin="0,5,0,0"
-                   FontSize="11"/>
+                    <TextBlock Text="Credits: " 
+                               Foreground="{StaticResource TextBrush}"
+                               FontWeight="Medium"
+                               Margin="0,20,0,5"/>
+
+                    <TextBlock Text="Development: KolarF1&#10;Testing: AMO Community&#10;Logo Design: W1echuz&#10;Special Thanks: Claude AI"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" 
+                               Margin="15,0,0,15"
+                               FontSize="12"/>
+
+                    <!-- Reset settings button -->
+                    <Button x:Name="ResetSettingsButton" 
+                            Content="Reset All Settings" 
+                            Style="{StaticResource ActionButton}"
+                            Click="ResetSettingsButton_Click"
+                            HorizontalAlignment="Left"
+                            Margin="0,10,0,0"
+                            Padding="8,5,8,5">
+                        <Button.ContentTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconBootstrapIcons Kind="ArrowRepeat" 
+                                                             Width="16" Height="16"
+                                                             VerticalAlignment="Center"
+                                                             Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding}" 
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </Button.ContentTemplate>
+                    </Button>
                 </StackPanel>
-            </StackPanel>
-        </Grid>
+            </Grid>
+        </ScrollViewer>
 
         <!-- Footer with Save/Cancel Buttons -->
         <Grid Grid.Row="2" Background="{StaticResource PrimaryBrush}" Height="46">
-            <StackPanel Orientation="Horizontal" Margin="559,0,0,0" Height="40" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0" Height="40" VerticalAlignment="Center">
                 <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource ActionButton}"
                         Click="CancelButton_Click" Background="#333333" Padding="10,6,10,6" FontWeight="Medium"/>
                 <Button x:Name="SaveButton" Content="Save" Style="{StaticResource PrimaryButton}"

@@ -86,10 +86,42 @@ namespace AMO_Launcher
             {
                 await _configService.LoadSettingsAsync();
 
-                await TrySelectGameAsync();
+                if (_configService.GetAutoDetectGamesAtStartup())
+                {
+                    await TrySelectGameAsync();
+                }
+                else
+                {
+                    string preferredGameId = _configService.GetPreferredGameId();
+                    if (!string.IsNullOrEmpty(preferredGameId))
+                    {
+                        var settings = await _configService.LoadSettingsAsync();
+                        var gameSetting = settings.Games.FirstOrDefault(g => g.Id == preferredGameId);
+                        if (gameSetting != null)
+                        {
+                            var gameInfo = new GameInfo
+                            {
+                                Id = gameSetting.Id,
+                                Name = gameSetting.Name,
+                                ExecutablePath = gameSetting.ExecutablePath,
+                                InstallDirectory = gameSetting.InstallDirectory,
+                                IsDefault = gameSetting.IsDefault,
+                                Icon = TryExtractIcon(gameSetting.ExecutablePath)
+                            };
+                            SetCurrentGame(gameInfo);
+                        }
+                        else
+                        {
+                            ShowNoGameSelectedUI();
+                        }
+                    }
+                    else
+                    {
+                        ShowNoGameSelectedUI();
+                    }
+                }
 
                 InitializeUi();
-
             }
             catch (Exception ex)
             {
@@ -163,7 +195,27 @@ namespace AMO_Launcher
             try
             {
                 var settings = await _configService.LoadSettingsAsync();
-                string preferredGameId = _configService.GetPreferredGameId();
+                bool rememberLastSelected = _configService.GetRememberLastSelectedGame();
+
+                string preferredGameId;
+
+                // Determine which game ID to use based on the remember last selected setting
+                if (rememberLastSelected)
+                {
+                    // Use the last selected game if the setting is enabled
+                    preferredGameId = _configService.GetLastSelectedGameId(); // You'll need to add this method to ConfigurationService
+
+                    // Fall back to default game if no last game exists
+                    if (string.IsNullOrEmpty(preferredGameId))
+                    {
+                        preferredGameId = _configService.GetDefaultGameId(); // Add this method to ConfigurationService
+                    }
+                }
+                else
+                {
+                    // Use only the default game if the setting is disabled
+                    preferredGameId = _configService.GetDefaultGameId();
+                }
 
                 if (settings.Games.Count > 0 && !string.IsNullOrEmpty(preferredGameId))
                 {
@@ -944,7 +996,21 @@ namespace AMO_Launcher
 
                 _configService.ResetModsChangedFlag();
 
-                this.WindowState = WindowState.Minimized;
+                // Handle launcher action based on settings
+                string launcherAction = _configService.GetLauncherActionOnGameLaunch();
+                switch (launcherAction)
+                {
+                    case "Close":
+                        Application.Current.Shutdown();
+                        break;
+                    case "Minimize":
+                        this.WindowState = WindowState.Minimized;
+                        break;
+                    case "None":
+                    default:
+                        // Do nothing
+                        break;
+                }
             }
             catch (Exception ex)
             {

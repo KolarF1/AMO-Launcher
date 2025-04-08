@@ -63,6 +63,11 @@ namespace AMO_Launcher.Services
 
                 try
                 {
+                    App.LogToFile("Beginning game scan");
+
+                    // Reset found games collection for this scan
+                    _foundGameExes.Clear();
+
                     // Check registry for Steam games
                     TryScanSteamRegistry(results, removedGamePaths);
 
@@ -72,33 +77,245 @@ namespace AMO_Launcher.Services
                     // Scan common installation folders
                     foreach (var path in _commonPaths.Where(p => !string.IsNullOrEmpty(p) && Directory.Exists(p)))
                     {
+                        App.LogToFile($"Scanning common path: {path}");
+                        ScanDirectoryForGames(path, results, removedGamePaths);
+                    }
+
+                    // Scan custom paths from settings
+                    var customPaths = _configService.GetCustomGameScanPaths();
+                    foreach (var path in customPaths.Where(p => !string.IsNullOrEmpty(p) && Directory.Exists(p)))
+                    {
+                        App.LogToFile($"Scanning custom path: {path}");
                         ScanDirectoryForGames(path, results, removedGamePaths);
                     }
 
                     // Add unique entries only (in case there are duplicates)
-                    return results.GroupBy(g => g.ExecutablePath)
-                                 .Select(g => g.First())
-                                 .ToList();
+                    var uniqueResults = results.GroupBy(g => g.ExecutablePath)
+                                             .Select(g => g.First())
+                                             .ToList();
+
+                    App.LogToFile($"Game scan complete, found {uniqueResults.Count} games");
+
+                    return uniqueResults;
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Error scanning for games: {ex.Message}");
+                    App.LogToFile($"Error scanning for games: {ex.Message}");
                     return results;
                 }
             });
         }
+
+        // Keep track of found games to filter duplicates
+        private Dictionary<string, List<string>> _foundGameExes = new Dictionary<string, List<string>>();
 
         // Scan a specific directory for F1 games
         private void ScanDirectoryForGames(string directory, List<GameInfo> results, List<string> removedGamePaths)
         {
             try
             {
-                // Search recursively (but limit depth to prevent excessive searching)
-                ScanDirectoryRecursive(directory, results, 0, 3, removedGamePaths);
+                // Reset found games collection
+                _foundGameExes.Clear();
+
+                // First pass: Collect all potential game executables
+                CollectGameExecutables(directory, 0, 3);
+
+                // Second pass: Filter and add the preferred executable for each game
+                foreach (var gameName in _foundGameExes.Keys)
+                {
+                    var exePaths = _foundGameExes[gameName];
+
+                    // If we only found one exe for this game, use it
+                    if (exePaths.Count == 1)
+                    {
+                        string exePath = exePaths[0];
+
+                        // Skip if this game was previously removed by the user
+                        if (removedGamePaths.Contains(exePath))
+                            continue;
+
+                        AddGameToResults(exePath, results);
+                    }
+                    // Otherwise, choose the preferred executable
+                    else if (exePaths.Count > 1)
+                    {
+                        string preferredExe = ChoosePreferredExecutable(gameName, exePaths);
+
+                        // Skip if this game was previously removed by the user
+                        if (removedGamePaths.Contains(preferredExe))
+                            continue;
+
+                        AddGameToResults(preferredExe, results);
+                    }
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error scanning directory {directory}: {ex.Message}");
+            }
+        }
+
+        // Collect all potential game executables in a directory
+        private void CollectGameExecutables(string directory, int currentDepth, int maxDepth)
+        {
+            if (currentDepth > maxDepth) return;
+
+            try
+            {
+                // Check all executable files in this directory
+                foreach (var file in Directory.GetFiles(directory, "*.exe", SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        string fileName = Path.GetFileName(file);
+                        bool isF1Game = false;
+                        string gameName = null;
+
+                        // Check against known patterns
+                        foreach (var (pattern, specificGameName) in _knownF1Games)
+                        {
+                            if (MatchesPattern(fileName, pattern))
+                            {
+                                isF1Game = true;
+                                // Extract base game name without the dx12 suffix
+                                gameName = specificGameName ?? DeriveGameName(fileName.Replace("_dx12", ""));
+                                break;
+                            }
+                        }
+
+                        if (isF1Game)
+                        {
+                            if (!_foundGameExes.ContainsKey(gameName))
+                            {
+                                _foundGameExes[gameName] = new List<string>();
+                            }
+
+                            _foundGameExes[gameName].Add(file);
+                            Debug.WriteLine($"Found game exe: {gameName} - {file}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error checking file {file}: {ex.Message}");
+                    }
+                }
+
+                // Check subdirectories
+                foreach (var subDir in Directory.GetDirectories(directory))
+                {
+                    CollectGameExecutables(subDir, currentDepth + 1, maxDepth);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error accessing {directory}: {ex.Message}");
+            }
+        }
+
+        // Choose the preferred executable when multiple are found
+        private string ChoosePreferredExecutable(string gameName, List<string> exePaths)
+        {
+            // For F1 Manager games
+            if (gameName.Contains("Manager"))
+            {
+                // Prefer the executable in the base directory
+                foreach (var exePath in exePaths)
+                {
+                    string directory = Path.GetDirectoryName(exePath);
+                    bool isInWin64 = directory != null &&
+                        (directory.Contains("\\Binaries\\Win64") ||
+                         directory.Contains("/Binaries/Win64"));
+
+                    if (!isInWin64)
+                    {
+                        Debug.WriteLine($"Choosing base directory exe for F1 Manager: {exePath}");
+                        return exePath;
+                    }
+                }
+            }
+            // For regular F1 games
+            else
+            {
+                // Check if we have a non-DX12 version
+                string nonDx12Exe = null;
+                string dx12Exe = null;
+
+                foreach (var exePath in exePaths)
+                {
+                    string fileName = Path.GetFileName(exePath);
+                    if (fileName.Contains("_dx12"))
+                    {
+                        dx12Exe = exePath;
+                    }
+                    else
+                    {
+                        nonDx12Exe = exePath;
+                    }
+                }
+
+                // Prefer non-DX12 version if available
+                if (nonDx12Exe != null)
+                {
+                    Debug.WriteLine($"Choosing non-DX12 exe for F1 game: {nonDx12Exe}");
+                    return nonDx12Exe;
+                }
+
+                // Otherwise use the DX12 version (e.g., for F1 2021 which only has DX12)
+                if (dx12Exe != null)
+                {
+                    Debug.WriteLine($"Only DX12 exe found for F1 game: {dx12Exe}");
+                    return dx12Exe;
+                }
+            }
+
+            // If we couldn't determine a preference, just return the first one
+            Debug.WriteLine($"No preferred exe found, using first: {exePaths[0]}");
+            return exePaths[0];
+        }
+
+        // Add a game to the results list
+        private void AddGameToResults(string exePath, List<GameInfo> results)
+        {
+            try
+            {
+                string fileName = Path.GetFileName(exePath);
+                string gameName = null;
+
+                // Check against known patterns to get the game name
+                foreach (var (pattern, specificGameName) in _knownF1Games)
+                {
+                    if (MatchesPattern(fileName, pattern))
+                    {
+                        gameName = specificGameName ?? DeriveGameName(fileName.Replace("_dx12", ""));
+                        break;
+                    }
+                }
+
+                if (gameName == null)
+                {
+                    return; // Not an F1 game
+                }
+
+                var gameInfo = new GameInfo
+                {
+                    ExecutablePath = exePath,
+                    InstallDirectory = Path.GetDirectoryName(exePath),
+                    Name = gameName,
+                    Version = GetFileVersion(exePath),
+                    Icon = _iconCacheService.GetIcon(exePath)
+                };
+                gameInfo.GenerateId(); // Generate the ID after setting properties
+
+                // Ensure we don't add duplicates
+                if (!results.Any(g => g.ExecutablePath == gameInfo.ExecutablePath))
+                {
+                    results.Add(gameInfo);
+                    Debug.WriteLine($"Added game to results: {gameInfo.Name} ({gameInfo.ExecutablePath})");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error adding game {exePath}: {ex.Message}");
             }
         }
 
@@ -178,6 +395,8 @@ namespace AMO_Launcher.Services
         {
             try
             {
+                App.LogToFile("Scanning Steam registry for games");
+
                 // Steam's registry path that contains installation directory
                 using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
                 {
@@ -228,7 +447,7 @@ namespace AMO_Launcher.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error scanning Steam registry: {ex.Message}");
+                App.LogToFile($"Error scanning Steam registry: {ex.Message}");
             }
         }
 
@@ -237,12 +456,14 @@ namespace AMO_Launcher.Services
         {
             try
             {
+                App.LogToFile("Scanning Windows registry for game installations");
+
                 // This approach checks the Windows uninstall registry locations
                 var registryKeys = new[]
                 {
-                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-                    @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-                };
+            @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        };
 
                 foreach (var baseKeyPath in registryKeys)
                 {
@@ -274,7 +495,7 @@ namespace AMO_Launcher.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error scanning registry installations: {ex.Message}");
+                App.LogToFile($"Error scanning registry installations: {ex.Message}");
             }
         }
 
