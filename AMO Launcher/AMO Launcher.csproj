@@ -26,6 +26,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\AMO_Updater\AMO_Updater.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<Page Update="MainWindow.xaml">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Page>
