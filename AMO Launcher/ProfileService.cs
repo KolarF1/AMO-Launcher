@@ -1253,5 +1253,170 @@ namespace AMO_Launcher.Services
                 App.LogToFile($"Stack trace: {ex.StackTrace}");
             }
         }
+
+        public ModProfile GetFullyLoadedActiveProfile(string gameId)
+        {
+            try
+            {
+                App.LogToFile($"GetFullyLoadedActiveProfile: Loading active profile for game {gameId}");
+
+                // Normalize game ID
+                gameId = NormalizeGameId(gameId);
+
+                if (string.IsNullOrEmpty(gameId))
+                {
+                    App.LogToFile("Game ID is null or empty");
+                    return new ModProfile();
+                }
+
+                // Make sure the profiles list exists
+                if (!_gameProfiles.ContainsKey(gameId))
+                {
+                    App.LogToFile($"No profiles found in memory for {gameId}, trying to load from storage");
+                    // Load profiles from file storage
+                    var loadProfilesTask = _storageService.GetProfilesForGameAsync(gameId);
+                    loadProfilesTask.Wait();
+                    var profiles = loadProfilesTask.Result;
+
+                    if (profiles != null && profiles.Count > 0)
+                    {
+                        _gameProfiles[gameId] = profiles;
+                        App.LogToFile($"Loaded {profiles.Count} profiles from storage for {gameId}");
+                    }
+                    else
+                    {
+                        App.LogToFile($"No profiles found in storage for {gameId}, getting default profiles");
+                        GetProfilesForGame(gameId); // This creates a default profile if needed
+                    }
+                }
+
+                // Get the active profile id
+                string activeProfileId = null;
+                if (_activeProfileIds.ContainsKey(gameId))
+                {
+                    activeProfileId = _activeProfileIds[gameId];
+                    App.LogToFile($"Found active profile ID in memory: {activeProfileId}");
+                }
+                else
+                {
+                    // Try to load from storage
+                    var getActiveIdTask = _storageService.GetActiveProfileIdAsync(gameId);
+                    getActiveIdTask.Wait();
+                    activeProfileId = getActiveIdTask.Result;
+
+                    if (!string.IsNullOrEmpty(activeProfileId))
+                    {
+                        _activeProfileIds[gameId] = activeProfileId;
+                        App.LogToFile($"Loaded active profile ID from storage: {activeProfileId}");
+                    }
+                }
+
+                // Find the active profile
+                ModProfile activeProfile = null;
+                if (!string.IsNullOrEmpty(activeProfileId) && _gameProfiles.ContainsKey(gameId))
+                {
+                    activeProfile = _gameProfiles[gameId].FirstOrDefault(p => p.Id == activeProfileId);
+                    if (activeProfile != null)
+                    {
+                        App.LogToFile($"Found active profile: {activeProfile.Name} with {activeProfile.AppliedMods?.Count ?? 0} mods");
+
+                        // Make sure AppliedMods is initialized
+                        if (activeProfile.AppliedMods == null)
+                        {
+                            activeProfile.AppliedMods = new List<AppliedModSetting>();
+                        }
+
+                        return activeProfile;
+                    }
+                    else
+                    {
+                        App.LogToFile($"Active profile with ID {activeProfileId} not found in memory");
+                    }
+                }
+
+                // If no active profile found, try loading it directly from storage
+                if (!string.IsNullOrEmpty(activeProfileId))
+                {
+                    var profilePath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "AMO_Launcher", "Profiles", $"{gameId}_{activeProfileId}.json");
+
+                    if (File.Exists(profilePath))
+                    {
+                        App.LogToFile($"Loading active profile directly from file: {profilePath}");
+                        var loadProfileTask = _storageService.LoadProfileAsync(profilePath);
+                        loadProfileTask.Wait();
+                        activeProfile = loadProfileTask.Result;
+
+                        if (activeProfile != null)
+                        {
+                            App.LogToFile($"Successfully loaded profile from file: {activeProfile.Name}");
+
+                            // Add to in-memory collection if not already there
+                            if (_gameProfiles.ContainsKey(gameId) &&
+                                !_gameProfiles[gameId].Any(p => p.Id == activeProfile.Id))
+                            {
+                                _gameProfiles[gameId].Add(activeProfile);
+                            }
+
+                            // Make sure AppliedMods is initialized
+                            if (activeProfile.AppliedMods == null)
+                            {
+                                activeProfile.AppliedMods = new List<AppliedModSetting>();
+                            }
+
+                            return activeProfile;
+                        }
+                    }
+                }
+
+                // If no active profile found, use the first one
+                if (_gameProfiles.ContainsKey(gameId) && _gameProfiles[gameId].Count > 0)
+                {
+                    activeProfile = _gameProfiles[gameId][0];
+                    _activeProfileIds[gameId] = activeProfile.Id;
+
+                    // Set this as the active profile in storage
+                    var setActiveTask = _storageService.SetActiveProfileAsync(gameId, activeProfile.Id);
+                    setActiveTask.Wait();
+
+                    App.LogToFile($"Using first profile as active: {activeProfile.Name}");
+
+                    // Make sure AppliedMods is initialized
+                    if (activeProfile.AppliedMods == null)
+                    {
+                        activeProfile.AppliedMods = new List<AppliedModSetting>();
+                    }
+
+                    return activeProfile;
+                }
+
+                // Still nothing found, create a new default profile
+                App.LogToFile("Creating new default profile as last resort");
+                var newProfile = new ModProfile();
+
+                if (!_gameProfiles.ContainsKey(gameId))
+                {
+                    _gameProfiles[gameId] = new List<ModProfile>();
+                }
+
+                _gameProfiles[gameId].Add(newProfile);
+                _activeProfileIds[gameId] = newProfile.Id;
+
+                // Save this new profile
+                var saveProfileTask = _storageService.SaveProfileAsync(gameId, newProfile);
+                saveProfileTask.Wait();
+                var setActiveIdTask = _storageService.SetActiveProfileAsync(gameId, newProfile.Id);
+                setActiveIdTask.Wait();
+
+                return newProfile;
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error in GetFullyLoadedActiveProfile: {ex.Message}");
+                App.LogToFile($"Stack trace: {ex.StackTrace}");
+                return new ModProfile(); // Return empty profile in case of error
+            }
+        }
     }
 }

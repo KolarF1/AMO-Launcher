@@ -519,8 +519,10 @@ namespace AMO_Launcher
 
             // Initialize profiles once
             InitializeProfiles();
-            // LoadProfilesIntoDropdown is already called within InitializeProfiles via UpdateProfileComboBox
-            // so we don't need to call it again here
+
+            // Make sure to load applied mods AFTER initializing profiles
+            // This fixes the issue where mods weren't loading on startup
+            await LoadAppliedModsAsync();
         }
 
         // Scan for mods for the current game
@@ -593,7 +595,6 @@ namespace AMO_Launcher
             }
         }
 
-
         // Load the applied mods list
         private async Task LoadAppliedModsAsync()
         {
@@ -611,17 +612,42 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // If we have a valid active profile with mods, use those
-                if (_activeProfile != null && _activeProfile.AppliedMods != null && _activeProfile.AppliedMods.Count > 0)
+                // Get normalized game ID
+                string normalizedGameId = GetNormalizedCurrentGameId();
+                App.LogToFile($"Loading mods for normalized game ID: {normalizedGameId}");
+
+                // If we have a valid active profile, try to load its mods
+                if (_activeProfile != null && _activeProfile.AppliedMods != null)
                 {
-                    App.LogToFile($"Loading mods from active profile: {_activeProfile.Name}");
-                    LoadAppliedModsFromProfile(_activeProfile);
-                    return;
+                    App.LogToFile($"Loading mods from active profile: {_activeProfile.Name} (ID: {_activeProfile.Id})");
+                    App.LogToFile($"Profile has {_activeProfile.AppliedMods.Count} mods");
+
+                    // Only load from profile if it actually has mods
+                    if (_activeProfile.AppliedMods.Count > 0)
+                    {
+                        LoadAppliedModsFromProfile(_activeProfile);
+                        return;
+                    }
+                    else
+                    {
+                        App.LogToFile("Active profile has no mods, checking config service");
+                    }
+                }
+                else
+                {
+                    App.LogToFile("No active profile or profile has no mods list");
                 }
 
                 // Fallback to using saved mods from ConfigService for backward compatibility
-                App.LogToFile("No mods in active profile, falling back to config service");
-                var appliedModSettings = _configService.GetAppliedMods(_currentGame.Id);
+                // Try both normalized and non-normalized game IDs
+                var appliedModSettings = _configService.GetAppliedMods(normalizedGameId);
+
+                // If no mods found with normalized ID, try the original ID
+                if ((appliedModSettings == null || appliedModSettings.Count == 0) && normalizedGameId != _currentGame.Id)
+                {
+                    App.LogToFile($"No mods found with normalized ID, trying original ID: {_currentGame.Id}");
+                    appliedModSettings = _configService.GetAppliedMods(_currentGame.Id);
+                }
 
                 if (appliedModSettings == null || appliedModSettings.Count == 0)
                 {
@@ -695,7 +721,7 @@ namespace AMO_Launcher
                 UpdateModPriorityDisplays();
                 DetectModConflicts();
 
-                // Also save these mods to the active profile
+                // Also save these mods to the active profile so they're available next time
                 if (_activeProfile != null && _appliedMods.Count > 0)
                 {
                     App.LogToFile("Saving applied mods to active profile for future use");
@@ -1028,8 +1054,28 @@ namespace AMO_Launcher
                     App.LogToFile($"  Saving mod path: {(mod.IsFromArchive ? mod.ArchiveSource : mod.ModFolderPath)}");
                 }
 
-                // Save to profile service (which will also update the active profile)
-                await _profileService.UpdateActiveProfileModsAsync(_currentGame.Id, appliedModSettings);
+                // Get normalized game ID
+                string normalizedGameId = GetNormalizedCurrentGameId();
+
+                // Save to both normalized and original game IDs in the config service
+                await _configService.SaveAppliedModsAsync(normalizedGameId, appliedModSettings);
+
+                // If the IDs are different, also save with the original ID
+                if (normalizedGameId != _currentGame.Id)
+                {
+                    await _configService.SaveAppliedModsAsync(_currentGame.Id, appliedModSettings);
+                }
+
+                // Update the active profile directly
+                if (_activeProfile != null)
+                {
+                    _activeProfile.AppliedMods = new List<AppliedModSetting>(appliedModSettings);
+                    _activeProfile.LastModified = DateTime.Now;
+                    App.LogToFile($"Updated active profile '{_activeProfile.Name}' with {appliedModSettings.Count} mods");
+                }
+
+                // Save to profile service (which will also update the active profile in storage)
+                await _profileService.UpdateActiveProfileModsAsync(normalizedGameId, appliedModSettings);
 
                 App.LogToFile("Mods saved successfully");
             }
@@ -2413,12 +2459,24 @@ namespace AMO_Launcher
                                 _profiles.Add(profile);
                             }
                         }
+                        App.LogToFile($"Loaded {_profiles.Count} profiles for game {_currentGame.Name}");
+                    }
+                    else
+                    {
+                        App.LogToFile("No profiles found, creating default profile");
+                        // No profiles found, create a default one
+                        var defaultProfile = new ModProfile();
+                        _profiles.Add(defaultProfile);
+
+                        // Save this new profile
+                        _profileService.ImportProfileDirectAsync(normalizedGameId, defaultProfile).ConfigureAwait(false);
                     }
 
-                    // Get the active profile
-                    _activeProfile = _profileService.GetActiveProfile(normalizedGameId);
+                    // Use the new method to get fully loaded active profile
+                    _activeProfile = _profileService.GetFullyLoadedActiveProfile(normalizedGameId);
 
-                    App.LogToFile($"Loaded {_profiles.Count} profiles for game {_currentGame.Name}");
+                    App.LogToFile($"Got active profile: {_activeProfile.Name} (ID: {_activeProfile.Id})");
+                    App.LogToFile($"Active profile has {_activeProfile.AppliedMods?.Count ?? 0} mods");
                 }
                 else
                 {
@@ -2583,25 +2641,38 @@ namespace AMO_Launcher
                 HorizontalAlignment = HorizontalAlignment.Right
             };
 
-            Button okButton = new Button
-            {
-                Content = "OK",
-                Width = 80,
-                Margin = new Thickness(0, 0, 10, 0),
-                Style = (Style)Application.Current.Resources["PrimaryButton"],
-                Foreground = Brushes.Black,
-                IsDefault = true
-            };
-            okButton.Click += (s, e) => { dialog.DialogResult = true; };
+            // Create consistent button style
+            var buttonHeight = 32; // Set a consistent height for both buttons
+            var buttonPadding = new Thickness(8, 4, 8, 4); // Consistent padding for both buttons
 
             Button cancelButton = new Button
             {
                 Content = "Cancel",
                 Width = 80,
+                Height = buttonHeight,
+                Padding = buttonPadding,
+                Margin = new Thickness(0, 0, 10, 0),
                 Style = (Style)Application.Current.Resources["ActionButton"],
-                IsCancel = true
+                IsCancel = true,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center
             };
 
+            Button okButton = new Button
+            {
+                Content = "OK",
+                Width = 80, // Keep same width as cancel button
+                Height = buttonHeight,
+                Padding = buttonPadding,
+                Style = (Style)Application.Current.Resources["PrimaryButton"],
+                Foreground = Brushes.Black,
+                IsDefault = true,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center
+            };
+            okButton.Click += (s, e) => { dialog.DialogResult = true; };
+
+            // Add buttons in the correct order
             buttonPanel.Children.Add(cancelButton);
             buttonPanel.Children.Add(okButton);
             panel.Children.Add(buttonPanel);
@@ -3163,6 +3234,12 @@ namespace AMO_Launcher
 
                 App.LogToFile($"Profile contains {profile.AppliedMods.Count} mods");
 
+                // Detailed logging of mods in profile
+                foreach (var mod in profile.AppliedMods)
+                {
+                    App.LogToFile($"  Profile mod: {(mod.IsFromArchive ? mod.ArchiveSource : mod.ModFolderPath)}, Active: {mod.IsActive}");
+                }
+
                 // Create a lookup dictionary of all available mods for faster searching
                 Dictionary<string, ModInfo> availableMods = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
                 foreach (var mod in _availableModsFlat)
@@ -3485,6 +3562,13 @@ namespace AMO_Launcher
                 // Save to ProfileService using normalized gameId
                 string normalizedGameId = GetNormalizedCurrentGameId();
                 await _profileService.UpdateActiveProfileModsAsync(normalizedGameId, currentMods);
+
+                // Also save to config service for both normalized and non-normalized game IDs
+                await _configService.SaveAppliedModsAsync(normalizedGameId, currentMods);
+                if (normalizedGameId != _currentGame.Id)
+                {
+                    await _configService.SaveAppliedModsAsync(_currentGame.Id, currentMods);
+                }
 
                 App.LogToFile($"Successfully saved {currentMods.Count} mods to profile '{_activeProfile.Name}'");
             }
