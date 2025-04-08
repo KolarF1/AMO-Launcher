@@ -956,10 +956,8 @@ namespace AMO_Launcher
 
         private async Task CheckAndApplyModsAsync()
         {
-            if (_currentGame.Name.Contains("Manager"))
-            {
+            if (_currentGame == null)
                 return;
-            }
 
             try
             {
@@ -996,51 +994,79 @@ namespace AMO_Launcher
                         "Preparing to apply mods..." :
                         "Restoring original game files...");
 
-                    string gameInstallDir = _currentGame.InstallDirectory;
-                    string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
+                    bool isF1ManagerGame = _currentGame.Name.Contains("Manager");
 
-                    if (!Directory.Exists(backupDir))
+                    if (isF1ManagerGame)
                     {
-                        progressWindow.ShowError("Original game data backup not found. Please reset your game data from the Settings window.");
-                        await Task.Delay(3000);
-                        return;
-                    }
+                        progressWindow.UpdateProgress(0.2, hasActiveMods ?
+                            "Preparing F1 Manager mods..." :
+                            "Removing F1 Manager mods...");
 
-                    await Task.Run(() =>
-                    {
-                        progressWindow.UpdateProgress(0.2, "Restoring original game files...");
-                        CopyDirectoryContents(backupDir, gameInstallDir);
-                    });
+                        var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
 
-                    if (!hasActiveMods)
-                    {
-                        progressWindow.UpdateProgress(0.9, "Game restored to original state and ready to launch!");
+                        try
+                        {
+                            await ApplyF1ManagerModsAsync(_currentGame, activeMods);
+
+                            progressWindow.UpdateProgress(0.9, hasActiveMods ?
+                                "All F1 Manager mods applied successfully!" :
+                                "All F1 Manager mods removed successfully!");
+                        }
+                        catch (DirectoryNotFoundException ex)
+                        {
+                            progressWindow.ShowError($"Error applying F1 Manager mods: {ex.Message}\n\nPlease check if the game is installed correctly.");
+                            await Task.Delay(3000);
+                            return;
+                        }
                     }
                     else
                     {
-                        var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
+                        string gameInstallDir = _currentGame.InstallDirectory;
+                        string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
 
-                        for (int i = 0; i < activeMods.Count; i++)
+                        if (!Directory.Exists(backupDir))
                         {
-                            var mod = activeMods[i];
-                            double progress = 0.2 + (i * 0.7 / activeMods.Count);
-
-                            progressWindow.UpdateProgress(progress, $"Applying mod ({i + 1}/{activeMods.Count}): {mod.Name}");
-
-                            await Task.Run(() =>
-                            {
-                                if (mod.IsFromArchive)
-                                {
-                                    ApplyModFromArchive(mod, gameInstallDir);
-                                }
-                                else if (!string.IsNullOrEmpty(mod.ModFilesPath) && Directory.Exists(mod.ModFilesPath))
-                                {
-                                    CopyDirectoryContents(mod.ModFilesPath, gameInstallDir);
-                                }
-                            });
+                            progressWindow.ShowError("Original game data backup not found. Please reset your game data from the Settings window.");
+                            await Task.Delay(3000);
+                            return;
                         }
 
-                        progressWindow.UpdateProgress(0.95, "All mods applied successfully!");
+                        await Task.Run(() =>
+                        {
+                            progressWindow.UpdateProgress(0.2, "Restoring original game files...");
+                            CopyDirectoryContents(backupDir, gameInstallDir);
+                        });
+
+                        if (!hasActiveMods)
+                        {
+                            progressWindow.UpdateProgress(0.9, "Game restored to original state and ready to launch!");
+                        }
+                        else
+                        {
+                            var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
+
+                            for (int i = 0; i < activeMods.Count; i++)
+                            {
+                                var mod = activeMods[i];
+                                double progress = 0.2 + (i * 0.7 / activeMods.Count);
+
+                                progressWindow.UpdateProgress(progress, $"Applying mod ({i + 1}/{activeMods.Count}): {mod.Name}");
+
+                                await Task.Run(() =>
+                                {
+                                    if (mod.IsFromArchive)
+                                    {
+                                        ApplyModFromArchive(mod, gameInstallDir);
+                                    }
+                                    else if (!string.IsNullOrEmpty(mod.ModFilesPath) && Directory.Exists(mod.ModFilesPath))
+                                    {
+                                        CopyDirectoryContents(mod.ModFilesPath, gameInstallDir);
+                                    }
+                                });
+                            }
+
+                            progressWindow.UpdateProgress(0.95, "All mods applied successfully!");
+                        }
                     }
 
                     _configService.SaveLastAppliedModsState(_currentGame.Id, currentActiveMods);
@@ -1080,20 +1106,42 @@ namespace AMO_Launcher
 
         private void CopyDirectoryContents(string sourceDir, string targetDir, Views.BackupProgressWindow progressWindow = null)
         {
-            Directory.CreateDirectory(targetDir);
-
-            foreach (string file in Directory.GetFiles(sourceDir))
+            try
             {
-                string fileName = Path.GetFileName(file);
-                string destFile = Path.Combine(targetDir, fileName);
-                File.Copy(file, destFile, true);
+                Directory.CreateDirectory(targetDir);
+
+                foreach (string file in Directory.GetFiles(sourceDir))
+                {
+                    try
+                    {
+                        string fileName = Path.GetFileName(file);
+                        string destFile = Path.Combine(targetDir, fileName);
+                        File.Copy(file, destFile, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        App.LogToFile($"Error copying file {file}: {ex.Message}");
+                    }
+                }
+
+                foreach (string directory in Directory.GetDirectories(sourceDir))
+                {
+                    try
+                    {
+                        string dirName = Path.GetFileName(directory);
+                        string destDir = Path.Combine(targetDir, dirName);
+                        CopyDirectoryContents(directory, destDir, progressWindow);
+                    }
+                    catch (Exception ex)
+                    {
+                        App.LogToFile($"Error processing directory {directory}: {ex.Message}");
+                    }
+                }
             }
-
-            foreach (string directory in Directory.GetDirectories(sourceDir))
+            catch (Exception ex)
             {
-                string dirName = Path.GetFileName(directory);
-                string destDir = Path.Combine(targetDir, dirName);
-                CopyDirectoryContents(directory, destDir, progressWindow);
+                App.LogToFile($"Error copying directory contents: {ex.Message}");
+                throw new IOException($"Failed to copy directory contents: {ex.Message}", ex);
             }
         }
 
@@ -2707,6 +2755,452 @@ namespace AMO_Launcher
                 return null;
 
             return NormalizeGameId(_currentGame.Id);
+        }
+
+        private async Task ApplyF1ManagerModsAsync(GameInfo game, List<ModInfo> activeMods)
+        {
+            string paksDirectory = FindF1ManagerPaksDirectory(game);
+
+            await CleanF1ManagerModsAsync(paksDirectory);
+
+            if (activeMods == null || activeMods.Count == 0)
+            {
+                return;
+            }
+
+            int priority = 1;
+
+            var orderedMods = activeMods.OrderByDescending(m => _appliedMods.IndexOf(m)).ToList();
+
+            foreach (var mod in orderedMods)
+            {
+                await ApplyF1ManagerModAsync(mod, paksDirectory, priority);
+                priority++;
+            }
+        }
+
+        private string FindF1ManagerPaksDirectory(GameInfo game)
+        {
+            var possiblePaths = new List<string>();
+
+            if (game.Name.Contains("2024") || game.Name.Contains("24"))
+            {
+                possiblePaths.Add(Path.Combine(game.InstallDirectory, "F1Manager24", "Content", "Paks"));
+            }
+            else if (game.Name.Contains("2023") || game.Name.Contains("23"))
+            {
+                possiblePaths.Add(Path.Combine(game.InstallDirectory, "F1Manager23", "Content", "Paks"));
+            }
+            else if (game.Name.Contains("2022") || game.Name.Contains("22"))
+            {
+                possiblePaths.Add(Path.Combine(game.InstallDirectory, "F1Manager22", "Content", "Paks"));
+            }
+
+            possiblePaths.Add(Path.Combine(game.InstallDirectory, "F1Manager24", "Content", "Paks"));
+            possiblePaths.Add(Path.Combine(game.InstallDirectory, "F1Manager23", "Content", "Paks"));
+            possiblePaths.Add(Path.Combine(game.InstallDirectory, "F1Manager22", "Content", "Paks"));
+
+            foreach (var path in possiblePaths)
+            {
+                if (Directory.Exists(path))
+                {
+                    return path;
+                }
+            }
+
+            throw new DirectoryNotFoundException($"Paks directory not found. Please make sure the game is installed correctly.");
+        }
+
+        private async Task CleanF1ManagerModsAsync(string paksDirectory)
+        {
+            var filesToDelete = new List<string>();
+
+            foreach (var file in Directory.GetFiles(paksDirectory, "pakchunk*-???-AMO-*.pak"))
+            {
+                filesToDelete.Add(file);
+
+                string basePath = Path.Combine(Path.GetDirectoryName(file), Path.GetFileNameWithoutExtension(file));
+
+                if (File.Exists(basePath + ".ucas"))
+                    filesToDelete.Add(basePath + ".ucas");
+
+                if (File.Exists(basePath + ".utoc"))
+                    filesToDelete.Add(basePath + ".utoc");
+            }
+
+            foreach (var file in filesToDelete)
+            {
+                try
+                {
+                    File.Delete(file);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error deleting file {file}: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task ApplyF1ManagerModAsync(ModInfo mod, string paksDirectory, int priority)
+        {
+            if (mod.IsFromArchive)
+            {
+                await ApplyF1ManagerModFromArchiveAsync(mod, paksDirectory, priority);
+            }
+            else
+            {
+                await ApplyF1ManagerModFromFolderAsync(mod, paksDirectory, priority);
+            }
+        }
+
+        private async Task ApplyF1ManagerModFromFolderAsync(ModInfo mod, string paksDirectory, int priority)
+        {
+            await Task.Run(() => {
+                string modFilesPath = mod.ModFilesPath;
+                if (string.IsNullOrEmpty(modFilesPath) || !Directory.Exists(modFilesPath))
+                    return;
+
+                foreach (var pakFile in Directory.GetFiles(modFilesPath, "pakchunk*.pak", SearchOption.AllDirectories))
+                {
+                    string fileName = Path.GetFileName(pakFile);
+                    string fileNameWithoutExt = Path.GetFileNameWithoutExtension(pakFile);
+
+                    var match = System.Text.RegularExpressions.Regex.Match(fileName, @"pakchunk(\d+)(?:-(\d+))?-(.+)\.pak");
+
+                    if (match.Success)
+                    {
+                        string chunkNumber = match.Groups[1].Value;
+                        string modName = match.Groups[3].Value;
+
+                        string priorityStr = priority.ToString("D3");
+
+                        string newFileName = $"pakchunk5-{priorityStr}-AMO-{modName}.pak";
+                        string destPath = Path.Combine(paksDirectory, newFileName);
+
+                        File.Copy(pakFile, destPath, true);
+
+                        string basePakPath = Path.Combine(Path.GetDirectoryName(pakFile), fileNameWithoutExt);
+                        string baseDestPath = Path.Combine(paksDirectory, Path.GetFileNameWithoutExtension(newFileName));
+
+                        if (File.Exists(basePakPath + ".ucas"))
+                            File.Copy(basePakPath + ".ucas", baseDestPath + ".ucas", true);
+
+                        if (File.Exists(basePakPath + ".utoc"))
+                            File.Copy(basePakPath + ".utoc", baseDestPath + ".utoc", true);
+                    }
+                    else if (fileName.StartsWith("pakchunk", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int dashIndex = fileName.IndexOf('-');
+                        string chunkNumber = dashIndex > 0
+                            ? fileName.Substring(8, dashIndex - 8)
+                            : fileName.Substring(8, fileName.Length - 8 - 4);
+
+                        string modName = mod.Name.Replace(' ', '_');
+                        string priorityStr = priority.ToString("D3");
+
+                        string newFileName = $"pakchunk5-{priorityStr}-AMO-{modName}.pak";
+                        string destPath = Path.Combine(paksDirectory, newFileName);
+
+                        File.Copy(pakFile, destPath, true);
+
+                        string basePakPath = Path.Combine(Path.GetDirectoryName(pakFile), fileNameWithoutExt);
+                        string baseDestPath = Path.Combine(paksDirectory, Path.GetFileNameWithoutExtension(newFileName));
+
+                        if (File.Exists(basePakPath + ".ucas"))
+                            File.Copy(basePakPath + ".ucas", baseDestPath + ".ucas", true);
+
+                        if (File.Exists(basePakPath + ".utoc"))
+                            File.Copy(basePakPath + ".utoc", baseDestPath + ".utoc", true);
+                    }
+                }
+            });
+        }
+
+        private async Task ApplyF1ManagerModFromArchiveAsync(ModInfo mod, string paksDirectory, int priority)
+        {
+            if (string.IsNullOrEmpty(mod.ArchiveSource) || !File.Exists(mod.ArchiveSource))
+                return;
+
+            using (var archive = SharpCompress.Archives.ArchiveFactory.Open(mod.ArchiveSource))
+            {
+                foreach (var entry in archive.Entries)
+                {
+                    if (entry.IsDirectory) continue;
+
+                    string entryKey = entry.Key.Replace('\\', '/');
+                    string fileName = Path.GetFileName(entryKey);
+                    string fileNameWithoutExt = Path.GetFileNameWithoutExtension(entryKey);
+
+                    if (fileName.StartsWith("pakchunk", StringComparison.OrdinalIgnoreCase) &&
+                        Path.GetExtension(entryKey).Equals(".pak", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var match = System.Text.RegularExpressions.Regex.Match(fileName, @"pakchunk(\d+)(?:-(\d+))?-(.+)\.pak");
+
+                        if (match.Success)
+                        {
+                            string chunkNumber = match.Groups[1].Value;
+                            string modName = match.Groups[3].Value;
+
+                            string priorityStr = priority.ToString("D3");
+
+                            string newFileName = $"pakchunk{chunkNumber}-{priorityStr}-AMO-{modName}.pak";
+                            string destPath = Path.Combine(paksDirectory, newFileName);
+
+                            using (var entryStream = entry.OpenEntryStream())
+                            using (var fileStream = new FileStream(destPath, FileMode.Create, FileAccess.Write))
+                            {
+                                await entryStream.CopyToAsync(fileStream);
+                            }
+
+                            string baseEntryName = fileNameWithoutExt;
+                            string baseDestName = Path.GetFileNameWithoutExtension(newFileName);
+
+                            var ucasEntry = archive.Entries.FirstOrDefault(e =>
+                                Path.GetFileNameWithoutExtension(e.Key.Replace('\\', '/')) == baseEntryName &&
+                                Path.GetExtension(e.Key).Equals(".ucas", StringComparison.OrdinalIgnoreCase));
+
+                            var utocEntry = archive.Entries.FirstOrDefault(e =>
+                                Path.GetFileNameWithoutExtension(e.Key.Replace('\\', '/')) == baseEntryName &&
+                                Path.GetExtension(e.Key).Equals(".utoc", StringComparison.OrdinalIgnoreCase));
+
+                            if (ucasEntry != null)
+                            {
+                                string ucasDestPath = Path.Combine(paksDirectory, baseDestName + ".ucas");
+                                using (var entryStream = ucasEntry.OpenEntryStream())
+                                using (var fileStream = new FileStream(ucasDestPath, FileMode.Create, FileAccess.Write))
+                                {
+                                    await entryStream.CopyToAsync(fileStream);
+                                }
+                            }
+
+                            if (utocEntry != null)
+                            {
+                                string utocDestPath = Path.Combine(paksDirectory, baseDestName + ".utoc");
+                                using (var entryStream = utocEntry.OpenEntryStream())
+                                using (var fileStream = new FileStream(utocDestPath, FileMode.Create, FileAccess.Write))
+                                {
+                                    await entryStream.CopyToAsync(fileStream);
+                                }
+                            }
+                        }
+                        else if (fileName.StartsWith("pakchunk", StringComparison.OrdinalIgnoreCase))
+                        {
+                            int dashIndex = fileName.IndexOf('-');
+                            string chunkNumber = dashIndex > 0
+                                ? fileName.Substring(8, dashIndex - 8)
+                                : fileName.Substring(8, fileName.Length - 8 - 4);
+
+                            string modName = mod.Name.Replace(' ', '_');
+                            string priorityStr = priority.ToString("D3");
+
+                            string newFileName = $"pakchunk{chunkNumber}-{priorityStr}-AMO-{modName}.pak";
+                            string destPath = Path.Combine(paksDirectory, newFileName);
+
+                            using (var entryStream = entry.OpenEntryStream())
+                            using (var fileStream = new FileStream(destPath, FileMode.Create, FileAccess.Write))
+                            {
+                                await entryStream.CopyToAsync(fileStream);
+                            }
+
+                            string baseEntryName = fileNameWithoutExt;
+                            string baseDestName = Path.GetFileNameWithoutExtension(newFileName);
+
+                            var ucasEntry = archive.Entries.FirstOrDefault(e =>
+                                Path.GetFileNameWithoutExtension(e.Key.Replace('\\', '/')) == baseEntryName &&
+                                Path.GetExtension(e.Key).Equals(".ucas", StringComparison.OrdinalIgnoreCase));
+
+                            var utocEntry = archive.Entries.FirstOrDefault(e =>
+                                Path.GetFileNameWithoutExtension(e.Key.Replace('\\', '/')) == baseEntryName &&
+                                Path.GetExtension(e.Key).Equals(".utoc", StringComparison.OrdinalIgnoreCase));
+
+                            if (ucasEntry != null)
+                            {
+                                string ucasDestPath = Path.Combine(paksDirectory, baseDestName + ".ucas");
+                                using (var entryStream = ucasEntry.OpenEntryStream())
+                                using (var fileStream = new FileStream(ucasDestPath, FileMode.Create, FileAccess.Write))
+                                {
+                                    await entryStream.CopyToAsync(fileStream);
+                                }
+                            }
+
+                            if (utocEntry != null)
+                            {
+                                string utocDestPath = Path.Combine(paksDirectory, baseDestName + ".utoc");
+                                using (var entryStream = utocEntry.OpenEntryStream())
+                                using (var fileStream = new FileStream(utocDestPath, FileMode.Create, FileAccess.Write))
+                                {
+                                    await entryStream.CopyToAsync(fileStream);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private async void ApplyChangesButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentGame == null)
+            {
+                MessageBox.Show("Please select a game first.", "No Game Selected",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                var currentActiveMods = _appliedMods.Where(m => m.IsActive)
+                    .Select(m => new AppliedModSetting
+                    {
+                        ModFolderPath = m.ModFolderPath,
+                        IsActive = true,
+                        IsFromArchive = m.IsFromArchive,
+                        ArchiveSource = m.ArchiveSource,
+                        ArchiveRootPath = m.ArchiveRootPath
+                    })
+                    .ToList();
+
+                bool modsChanged = _configService.HaveModsChanged(_currentGame.Id, currentActiveMods);
+
+                if (!modsChanged)
+                {
+                    MessageBox.Show("No changes detected to apply.", "No Changes",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var progressWindow = new Views.BackupProgressWindow();
+                progressWindow.Owner = this;
+                progressWindow.SetGame(_currentGame);
+                progressWindow.SetOperationType("Applying Mod Changes");
+                Application.Current.Dispatcher.Invoke(() => { progressWindow.Show(); });
+
+                try
+                {
+                    bool hasActiveMods = currentActiveMods.Count > 0;
+                    bool isF1ManagerGame = _currentGame.Name.Contains("Manager");
+
+                    progressWindow.UpdateProgress(0.1, hasActiveMods ?
+                        "Preparing to apply mods..." :
+                        "Preparing to remove mods...");
+
+                    if (isF1ManagerGame)
+                    {
+                        progressWindow.UpdateProgress(0.3, hasActiveMods ?
+                            "Applying F1 Manager mods..." :
+                            "Removing F1 Manager mods...");
+
+                        var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
+
+                        try
+                        {
+                            string paksDirectory = FindF1ManagerPaksDirectory(_currentGame);
+                            await CleanF1ManagerModsAsync(paksDirectory);
+
+                            if (hasActiveMods)
+                            {
+                                int priority = 1;
+                                var orderedMods = activeMods.OrderByDescending(m => _appliedMods.IndexOf(m)).ToList();
+
+                                for (int i = 0; i < orderedMods.Count; i++)
+                                {
+                                    var mod = orderedMods[i];
+                                    double progress = 0.3 + (i * 0.5 / orderedMods.Count);
+                                    progressWindow.UpdateProgress(progress, $"Applying mod ({i + 1}/{orderedMods.Count}): {mod.Name}");
+                                    await ApplyF1ManagerModAsync(mod, paksDirectory, priority);
+                                    priority++;
+                                }
+                            }
+
+                            progressWindow.UpdateProgress(0.9, hasActiveMods ?
+                                "All F1 Manager mods applied successfully!" :
+                                "All F1 Manager mods removed successfully!");
+                        }
+                        catch (DirectoryNotFoundException ex)
+                        {
+                            progressWindow.ShowError($"Error applying F1 Manager mods: {ex.Message}\n\nPlease check if the game is installed correctly.");
+                            await Task.Delay(3000);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        string gameInstallDir = _currentGame.InstallDirectory;
+                        string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
+
+                        if (!Directory.Exists(backupDir))
+                        {
+                            progressWindow.ShowError("Original game data backup not found. Please reset your game data from the Settings window.");
+                            await Task.Delay(3000);
+                            return;
+                        }
+
+                        await Task.Run(() =>
+                        {
+                            progressWindow.UpdateProgress(0.3, "Restoring original game files...");
+                            CopyDirectoryContents(backupDir, gameInstallDir);
+                        });
+
+                        if (hasActiveMods)
+                        {
+                            var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
+
+                            for (int i = 0; i < activeMods.Count; i++)
+                            {
+                                var mod = activeMods[i];
+                                double progress = 0.3 + (i * 0.5 / activeMods.Count);
+
+                                progressWindow.UpdateProgress(progress, $"Applying mod ({i + 1}/{activeMods.Count}): {mod.Name}");
+
+                                await Task.Run(() =>
+                                {
+                                    if (mod.IsFromArchive)
+                                    {
+                                        ApplyModFromArchive(mod, gameInstallDir);
+                                    }
+                                    else if (!string.IsNullOrEmpty(mod.ModFilesPath) && Directory.Exists(mod.ModFilesPath))
+                                    {
+                                        CopyDirectoryContents(mod.ModFilesPath, gameInstallDir);
+                                    }
+                                });
+                            }
+
+                            progressWindow.UpdateProgress(0.9, "All mods applied successfully!");
+                        }
+                        else
+                        {
+                            progressWindow.UpdateProgress(0.9, "Game restored to original state!");
+                        }
+                    }
+
+                    _configService.SaveLastAppliedModsState(_currentGame.Id, currentActiveMods);
+                    _configService.ResetModsChangedFlag();
+
+                    progressWindow.UpdateProgress(1.0, "Changes applied successfully!");
+                    await Task.Delay(1000);
+
+                }
+                catch (Exception ex)
+                {
+                    progressWindow.ShowError($"Error applying changes: {ex.Message}");
+                    await Task.Delay(3000);
+                }
+                finally
+                {
+                    Application.Current.Dispatcher.Invoke(() => { progressWindow.Close(); });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error applying changes: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+            }
         }
 
 

@@ -7,9 +7,6 @@ using System.IO;
 
 namespace AMO_Launcher.Views
 {
-    /// <summary>
-    /// Interaction logic for SettingsWindow.xaml
-    /// </summary>
     public partial class SettingsWindow : Window
     {
         private GameInfo _currentGame;

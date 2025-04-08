@@ -8,9 +8,6 @@ using System.Threading.Tasks;
 
 namespace AMO_Launcher.Services
 {
-    /// <summary>
-    /// Service for storing and retrieving profiles from individual files
-    /// </summary>
     public class ProfileStorageService
     {
         private readonly string _profilesDirectoryPath;
@@ -38,9 +35,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Saves a profile to an individual file
-        /// </summary>
         public async Task SaveProfileAsync(string gameId, ModProfile profile)
         {
             try
@@ -77,9 +71,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Loads a profile from a file
-        /// </summary>
         public async Task<ModProfile> LoadProfileAsync(string filePath)
         {
             try
@@ -117,9 +108,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Gets all profiles for a specific game
-        /// </summary>
         public async Task<List<ModProfile>> GetProfilesForGameAsync(string gameId)
         {
             try
@@ -152,9 +140,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Sets the active profile for a game
-        /// </summary>
         public async Task SetActiveProfileAsync(string gameId, string profileId)
         {
             try
@@ -182,9 +167,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Gets the active profile ID for a game
-        /// </summary>
         public async Task<string> GetActiveProfileIdAsync(string gameId)
         {
             try
@@ -219,9 +201,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Deletes a profile
-        /// </summary>
         public async Task<bool> DeleteProfileAsync(string gameId, string profileId)
         {
             try
@@ -256,9 +235,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Gets all game IDs that have profiles
-        /// </summary>
         public Task<List<string>> GetGameIdsWithProfilesAsync()
         {
             try
@@ -292,9 +268,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Migrates profiles from the settings to individual files (for backward compatibility)
-        /// </summary>
         public async Task MigrateFromSettingsAsync(Dictionary<string, List<ModProfile>> gameProfiles, Dictionary<string, string> activeProfileIds)
         {
             try
@@ -353,9 +326,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        /// <summary>
-        /// Sanitizes a string for use in a filename
-        /// </summary>
         private string SanitizeForFileName(string input)
         {
             if (string.IsNullOrEmpty(input))

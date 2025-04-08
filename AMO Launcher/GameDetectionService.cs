@@ -42,9 +42,9 @@ namespace AMO_Launcher.Services
             ("F1_24.exe", "F1 24"),     // F1 24
             ("F1_25.exe", "F1 25"),     // F1 25
             ("F1Manager*.exe", null),    // F1 Manager games
-            ("F1Manager22.exe", "F1 Manager 2022"), // F1 Manager 22
-            ("F1Manager23.exe", "F1 Manager 2023"), // F1 Manager 23
-            ("F1Manager24.exe", "F1 Manager 2024")  // F1 Manager 24
+            ("F1Manager22.exe", "F1 Manager 22"), // F1 Manager 22
+            ("F1Manager23.exe", "F1 Manager 23"), // F1 Manager 23
+            ("F1Manager24.exe", "F1 Manager 24")  // F1 Manager 24
         };
 
         public GameDetectionService()
@@ -335,8 +335,6 @@ namespace AMO_Launcher.Services
                 if (match.Success)
                 {
                     string year = match.Groups[1].Value;
-                    // Convert 2-digit year to 4-digit year if needed
-                    if (year.Length == 2) year = "20" + year;
                     return $"F1 Manager {year}";
                 }
                 return "F1 Manager";

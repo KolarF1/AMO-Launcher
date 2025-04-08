@@ -6,9 +6,6 @@ using System.Windows.Media.Imaging;
 
 namespace AMO_Launcher.Services
 {
-    /// <summary>
-    /// Provides application-wide caching for game icons
-    /// </summary>
     public class IconCacheService
     {
         // Static cache for application lifetime

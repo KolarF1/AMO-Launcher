@@ -1028,7 +1028,7 @@
           SelectionChanged="ProfileComboBox_SelectionChanged"
           Height="25.96" Margin="9,11,0,11" VerticalContentAlignment="Center" Width="128"/>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,7,155,7" Grid.ColumnSpan="2">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,7,128,7" Grid.ColumnSpan="2">
                     <Button x:Name="NewProfileButton" Style="{StaticResource ProfileActionButtonStyle}" 
         ToolTip="New Profile">
                         <iconPacks:PackIconBootstrapIcons Kind="FileEarmarkPlus" Width="22" Height="22"/>
@@ -1066,10 +1066,23 @@
                 </Button>
                 <!-- Red: Launch Game Button -->
                 <Button Grid.Column="4" Style="{StaticResource LaunchGameButtonStyle}" 
+                        Margin="4,12,142,11" Padding="6,2,6,4" 
+                        HorizontalContentAlignment="Center"
+                        Width="128" Height="25.96"
+                        Click="ApplyChangesButton_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconBootstrapIcons Kind="Save2" 
+                                       Width="16" Height="16" 
+                                       HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="0,2,4,0"/>
+                        <TextBlock Text="Apply Changes" FontWeight="Medium"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Grid.Column="4" Style="{StaticResource LaunchGameButtonStyle}" 
                         Margin="4,12,10,11" Padding="11,3,11,4" 
                         HorizontalContentAlignment="Center"
                         Width="128" Height="25.96"
-                        Click="LaunchGameButton_Click">
+                        Click="LaunchGameButton_Click" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconBootstrapIcons Kind="PlayFill" 
                                                          Width="16" Height="16" 
