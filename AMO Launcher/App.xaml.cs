@@ -14,7 +14,7 @@ namespace AMO_Launcher
         public static ManualGameIconService ManualGameIconService { get; private set; } = null!;
         public static ModDetectionService ModDetectionService { get; private set; } = null!;
         public static GameBackupService GameBackupService { get; private set; } = null!;
-        public static ProfileService ProfileService { get; private set; } = null!; // New service
+        public static ProfileService ProfileService { get; private set; } = null!;
 
         // Log file for debugging
         private static readonly string LogFilePath;
@@ -123,6 +123,9 @@ namespace AMO_Launcher
                 // Load profiles from persistent storage
                 await ProfileService.LoadProfilesAsync();
                 LogToFile("Profiles loaded from persistent storage");
+
+                // Migrate profiles to normalize game IDs
+                await ProfileService.MigrateGameProfilesAsync();
 
                 // Log successful initialization
                 LogToFile("All services initialized successfully");

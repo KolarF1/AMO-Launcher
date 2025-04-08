@@ -162,8 +162,11 @@ namespace AMO_Launcher.Models
             // Get the file name without extension
             string fileName = Path.GetFileNameWithoutExtension(ExecutablePath);
 
-            // Use the filename directly as the ID
-            Id = fileName;
+            // Replace underscores with spaces to normalize the ID
+            string normalizedName = fileName.Replace('_', ' ');
+
+            // Use just the normalized name without any additional hash/suffix
+            Id = normalizedName;
         }
 
         public override string ToString()

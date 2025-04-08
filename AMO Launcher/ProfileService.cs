@@ -904,7 +904,71 @@ namespace AMO_Launcher.Services
 
         private string NormalizeGameId(string gameId)
         {
-            return string.IsNullOrEmpty(gameId) ? gameId : gameId.Trim();
+            if (string.IsNullOrEmpty(gameId))
+                return gameId;
+
+            // Remove any numeric suffix after underscore
+            int underscoreIndex = gameId.IndexOf('_');
+            if (underscoreIndex > 0)
+            {
+                // Check if the part after underscore is numeric or starts with a dash
+                string suffix = gameId.Substring(underscoreIndex + 1);
+                if (suffix.StartsWith("-") || char.IsDigit(suffix[0]))
+                    return gameId.Substring(0, underscoreIndex).Trim();
+            }
+
+            return gameId.Trim();
+        }
+
+        public async Task MigrateGameProfilesAsync()
+        {
+            try
+            {
+                // Get all game IDs with profiles
+                var gameIds = _gameProfiles.Keys.ToList();
+
+                foreach (var gameId in gameIds)
+                {
+                    // Normalize the game ID
+                    string normalizedId = NormalizeGameId(gameId);
+
+                    // Skip if already normalized
+                    if (normalizedId == gameId)
+                        continue;
+
+                    // If we have profiles for both the original and normalized ID, merge them
+                    if (_gameProfiles.ContainsKey(normalizedId))
+                    {
+                        // Append profiles from the non-normalized ID
+                        _gameProfiles[normalizedId].AddRange(_gameProfiles[gameId]);
+
+                        // Remove the old entry
+                        _gameProfiles.Remove(gameId);
+                    }
+                    else
+                    {
+                        // Move profiles to the normalized ID
+                        _gameProfiles[normalizedId] = _gameProfiles[gameId];
+                        _gameProfiles.Remove(gameId);
+                    }
+
+                    // Update active profile ID if needed
+                    if (_activeProfileIds.ContainsKey(gameId))
+                    {
+                        _activeProfileIds[normalizedId] = _activeProfileIds[gameId];
+                        _activeProfileIds.Remove(gameId);
+                    }
+                }
+
+                // Save changes
+                await SaveProfilesAsync();
+
+                App.LogToFile("Profile migration completed successfully");
+            }
+            catch (Exception ex)
+            {
+                App.LogToFile($"Error migrating profiles: {ex.Message}");
+            }
         }
     }
 }
