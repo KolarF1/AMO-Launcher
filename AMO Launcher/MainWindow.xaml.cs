@@ -21,7 +21,6 @@ namespace AMO_Launcher
 {
     public partial class MainWindow : Window
     {
-        // Services (accessed via App static properties)
         private GameDetectionService _gameDetectionService => App.GameDetectionService;
         private ConfigurationService _configService => App.ConfigService;
         private ModDetectionService _modDetectionService => App.ModDetectionService;
@@ -30,18 +29,14 @@ namespace AMO_Launcher
         private List<ModProfile> _profiles = new List<ModProfile>();
         private ModProfile _activeProfile;
 
-        // Collections for UI
         private ObservableCollection<ModInfo> _availableModsFlat;
         private ObservableCollection<ModCategory> _availableModsCategories;
         private ObservableCollection<ModInfo> _appliedMods;
 
-        // Currently selected game
         private GameInfo _currentGame;
 
-        // Track if mods need to be reapplied
         private bool _appliedModsChanged = false;
 
-        // Window state tracking
         private bool _isMaximized = false;
 
         public MainWindow()
@@ -49,27 +44,21 @@ namespace AMO_Launcher
             InitializeComponent();
             InitializeConflictSystem();
 
-            // Initialize collections
             _availableModsFlat = new ObservableCollection<ModInfo>();
             _availableModsCategories = new ObservableCollection<ModCategory>();
             _appliedMods = new ObservableCollection<ModInfo>();
 
-            // Set up the TreeView for mods
             AvailableModsTreeView.ItemsSource = _availableModsCategories;
             AppliedModsListView.ItemsSource = _appliedMods;
 
-            // Set window title with version
             Title = $"AMO Launcher v{GetAppVersion()}";
 
-            // Add window chrome resize handler
             this.SizeChanged += MainWindow_SizeChanged;
 
-            // Initialize buttons visibility based on selected tab
             if (ModTabControl != null)
             {
                 ModTabControl.SelectionChanged += TabControl_SelectionChanged;
 
-                // Set initial visibility
                 if (ModActionButtons != null)
                 {
                     ModActionButtons.Visibility =
@@ -78,36 +67,26 @@ namespace AMO_Launcher
                             : Visibility.Collapsed;
                 }
             }
-
-            // Set up the context menu for the mods list
         }
 
-        // Get application version from assembly
         private string GetAppVersion()
         {
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
             return $"{version.Major}.{version.Minor}.{version.Build}";
         }
 
-        // Window loaded event handler
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            // Show loading indicator
             Mouse.OverrideCursor = Cursors.Wait;
 
             try
             {
-                // Load settings
                 await _configService.LoadSettingsAsync();
 
-                // Try to find and select a game
                 await TrySelectGameAsync();
 
-                // Initialize UI components including buttons
                 InitializeUi();
 
-                // Note: Don't manually set up the ComboBox here
-                // The profiles will be loaded when a game is selected
             }
             catch (Exception ex)
             {
@@ -116,94 +95,79 @@ namespace AMO_Launcher
             }
             finally
             {
-                // Hide loading indicator
                 Mouse.OverrideCursor = null;
             }
         }
 
         #region Custom Title Bar Handlers
 
-        // Handle window dragging
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount == 2)
             {
-                // Double click to maximize/restore
                 MaximizeButton_Click(sender, e);
             }
             else
             {
-                // Single click to drag
                 this.DragMove();
             }
         }
 
-        // Handle minimize button click
         private void MinimizeButton_Click(object sender, RoutedEventArgs e)
         {
             this.WindowState = WindowState.Minimized;
         }
 
-        // Handle maximize/restore button click
         private void MaximizeButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isMaximized)
             {
-                // Restore window
                 this.WindowState = WindowState.Normal;
-                MaximizeButton.Content = "\uE922"; // Maximize icon
+                MaximizeButton.Content = "\uE922";
                 _isMaximized = false;
             }
             else
             {
-                // Maximize window
                 this.WindowState = WindowState.Maximized;
-                MaximizeButton.Content = "\uE923"; // Restore icon
+                MaximizeButton.Content = "\uE923";
                 _isMaximized = true;
             }
         }
 
-        // Handle close button click
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             this.Close();
         }
 
-        // Update the maximize/restore button when window state changes
         private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (this.WindowState == WindowState.Maximized)
             {
-                MaximizeButton.Content = "\uE923"; // Restore icon
+                MaximizeButton.Content = "\uE923";
                 _isMaximized = true;
             }
             else
             {
-                MaximizeButton.Content = "\uE922"; // Maximize icon
+                MaximizeButton.Content = "\uE922";
                 _isMaximized = false;
             }
         }
 
         #endregion
 
-        // Try to find and select a game from settings or scan
         private async Task TrySelectGameAsync()
         {
             try
             {
-                // First, load settings to get preferred game ID
                 var settings = await _configService.LoadSettingsAsync();
                 string preferredGameId = _configService.GetPreferredGameId();
 
-                // Check if we have any saved games
                 if (settings.Games.Count > 0 && !string.IsNullOrEmpty(preferredGameId))
                 {
-                    // Try to find the preferred game
                     var gameSetting = settings.Games.FirstOrDefault(g => g.Id == preferredGameId);
 
                     if (gameSetting != null)
                     {
-                        // Create GameInfo from saved setting
                         var gameInfo = new GameInfo
                         {
                             Id = gameSetting.Id,
@@ -211,36 +175,28 @@ namespace AMO_Launcher
                             ExecutablePath = gameSetting.ExecutablePath,
                             InstallDirectory = gameSetting.InstallDirectory,
                             IsDefault = gameSetting.IsDefault,
-                            // Extract the icon (try-catch just in case)
                             Icon = TryExtractIcon(gameSetting.ExecutablePath)
                         };
-
-                        // Set as current game
                         SetCurrentGame(gameInfo);
                         return;
                     }
                 }
 
-                // If we get here, we need to scan for games
                 var detectedGames = await _gameDetectionService.ScanForGamesAsync();
 
                 if (detectedGames.Count > 0)
                 {
-                    // Select the first game or prompt user to choose
                     if (detectedGames.Count == 1)
                     {
-                        // Only one game found, use it
                         SetCurrentGame(detectedGames[0]);
                     }
                     else
                     {
-                        // Multiple games found, show game selection dialog
                         ShowGameSelectionDialog();
                     }
                 }
                 else
                 {
-                    // No games found
                     ShowNoGameSelectedUI();
                 }
             }
@@ -256,80 +212,58 @@ namespace AMO_Launcher
         {
             base.OnInitialized(e);
 
-            // Listen for mod selection changes in the TreeView
             AvailableModsTreeView.SelectedItemChanged += AvailableModsTreeView_SelectedItemChanged;
 
-            // Add double-click handler to TreeView
             AvailableModsTreeView.MouseDoubleClick += AvailableModsTreeView_MouseDoubleClick;
 
-            // Add double-click handler to AppliedModsListView for removing mods
             AppliedModsListView.MouseDoubleClick += AppliedModsListView_MouseDoubleClick;
         }
 
-        // Handle double-click on available mods to add to applied mods
         private void AvailableModsTreeView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            // Get the item that was clicked
             DependencyObject originalSource = (DependencyObject)e.OriginalSource;
             while (originalSource != null && !(originalSource is TreeViewItem))
             {
                 originalSource = VisualTreeHelper.GetParent(originalSource);
             }
 
-            // Make sure we clicked on an actual item
             if (originalSource is TreeViewItem)
             {
-                // Get the data context of the item
                 object item = ((TreeViewItem)originalSource).DataContext;
 
-                // Only add mod if it's a ModInfo, not a category
                 if (item is ModInfo selectedMod)
                 {
-                    // Add the mod to applied mods
                     AddModToApplied(selectedMod);
 
-                    // Switch to the Applied Mods tab
                     ModTabControl.SelectedItem = AppliedModsTab;
                 }
             }
         }
 
-
-        // Add this new event handler
         private void AvailableModsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            // Only handle mod selection, not category selection
             if (e.NewValue is ModInfo selectedMod)
             {
-                // Show or hide the Description tab based on whether a mod is selected
                 bool modSelected = selectedMod != null;
 
-                // Set the visibility of the Description tab
                 DescriptionTab.Visibility = modSelected ? Visibility.Visible : Visibility.Collapsed;
 
-                // Only handle the case when no mod is selected but the Description tab is selected
                 if (!modSelected && ModTabControl.SelectedItem == DescriptionTab)
                 {
-                    // If no mod is selected but the Description tab is selected, switch to Applied Mods tab
                     ModTabControl.SelectedItem = AppliedModsTab;
                 }
 
-                // Check if a mod is selected and update the description text
                 if (modSelected)
                 {
-                    // Check if description is empty or null
                     if (string.IsNullOrWhiteSpace(selectedMod.Description))
                     {
-                        // Update the description text to show "No Description"
                         ModDescriptionTextBlock.Text = "No Description";
                     }
                     else
                     {
-                        // Ensure we display the actual description for mods that have one
                         ModDescriptionTextBlock.Text = selectedMod.Description;
                     }
 
-                    // Update other description fields
                     ModNameTextBlock.Text = selectedMod.Name;
                     ModAuthorTextBlock.Text = selectedMod.Author;
                     ModVersionTextBlock.Text = selectedMod.Version;
@@ -341,22 +275,18 @@ namespace AMO_Launcher
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            // Create and show the settings window
             var settingsWindow = new Views.SettingsWindow();
-            settingsWindow.Owner = this; // Set the main window as the owner
-            settingsWindow.ShowDialog(); // Show as dialog (modal)
+            settingsWindow.Owner = this;
+            settingsWindow.ShowDialog();
         }
 
-        // Change game button click handler
         private void ChangeGameButton_Click(object sender, RoutedEventArgs e)
         {
             ShowGameSelectionDialog();
         }
 
-        // Apply button click handler
         private void ApplyModsButton_Click(object sender, RoutedEventArgs e)
         {
-            // Check if a game is selected
             if (_currentGame == null)
             {
                 MessageBox.Show("Please select a game first.", "No Game Selected",
@@ -364,7 +294,6 @@ namespace AMO_Launcher
                 return;
             }
 
-            // Get selected mod if it's a ModInfo (not a category)
             var selectedItem = AvailableModsTreeView.SelectedItem;
             if (selectedItem == null)
             {
@@ -373,7 +302,6 @@ namespace AMO_Launcher
                 return;
             }
 
-            // Handle selection of a ModInfo
             if (selectedItem is ModInfo selectedMod)
             {
                 AddModToApplied(selectedMod);
@@ -381,10 +309,8 @@ namespace AMO_Launcher
                 return;
             }
 
-            // Handle selection of a category
             if (selectedItem is ModCategory category)
             {
-                // Add all mods in the category
                 foreach (var mod in category.Mods)
                 {
                     AddModToApplied(mod);
@@ -395,26 +321,20 @@ namespace AMO_Launcher
             }
         }
 
-
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Show/hide the mod action buttons based on which tab is selected
             if (ModActionButtons != null)
             {
-                // Only show buttons when Applied Mods tab is selected (not on Conflicts or Description tabs)
                 ModActionButtons.Visibility =
                     ModTabControl.SelectedItem == AppliedModsTab
                         ? Visibility.Visible
                         : Visibility.Collapsed;
 
-                // Force the buttons panel to update its visual state
                 ModActionButtons.UpdateLayout();
             }
 
-            // Handle "No conflicts" message when Conflicts tab is selected
             if (ModTabControl.SelectedItem == ConflictsTab)
             {
-                // Check if we have any conflicts
                 bool hasConflicts = false;
 
                 if (ConflictsListView.ItemsSource is IEnumerable<ConflictItem> conflictItems)
@@ -422,15 +342,12 @@ namespace AMO_Launcher
                     hasConflicts = conflictItems.Any();
                 }
 
-                // Find the parent grid
                 var parent = VisualTreeHelper.GetParent(ConflictsListView) as Grid;
                 if (parent != null)
                 {
-                    // Find existing message if it exists
                     var existingMessage = parent.Children.OfType<TextBlock>()
                         .FirstOrDefault(tb => tb.Name == "NoConflictsMessage");
 
-                    // If no conflicts and no message yet, add the message
                     if (!hasConflicts && existingMessage == null)
                     {
                         var noConflictsMessage = new TextBlock
@@ -449,22 +366,18 @@ namespace AMO_Launcher
 
                         parent.Children.Add(noConflictsMessage);
 
-                        // Hide the ListView
                         ConflictsListView.Visibility = Visibility.Collapsed;
                     }
-                    // If we have conflicts but also have the message, remove the message
                     else if (hasConflicts && existingMessage != null)
                     {
                         parent.Children.Remove(existingMessage);
 
-                        // Make sure conflicts are visible
                         ConflictsListView.Visibility = Visibility.Visible;
                     }
                 }
             }
         }
 
-        // Show the game selection dialog
         private void ShowGameSelectionDialog()
         {
             var gameSelectionWindow = new GameSelectionWindow(_gameDetectionService, _configService);
@@ -480,32 +393,25 @@ namespace AMO_Launcher
             }
             else if (_currentGame == null)
             {
-                // If no game was selected and we don't have a current game
                 ShowNoGameSelectedUI();
             }
         }
 
-        // Set the current game and update UI
         private async void SetCurrentGame(GameInfo game)
         {
             _currentGame = game;
 
-            // Update UI
             CurrentGameTextBlock.Text = game.Name;
 
-            // Always show game content panel
             GameContentPanel.Visibility = Visibility.Visible;
 
-            // Reset applied mods changed flag
             _appliedModsChanged = false;
 
-            // Check for Original_GameData backup for non-Manager games
             if (!game.Name.Contains("Manager"))
             {
                 bool backupReady = await _gameBackupService.EnsureOriginalGameDataBackupAsync(game);
                 if (!backupReady)
                 {
-                    // User cancelled backup creation
                     MessageBox.Show(
                         "Game backup was not created. Some mod features may be limited or not work correctly.",
                         "Backup Not Created",
@@ -514,47 +420,34 @@ namespace AMO_Launcher
                 }
             }
 
-            // Scan for mods for the selected game
             await ScanForModsAsync();
 
-            // Initialize profiles once
             InitializeProfiles();
-
-            // Make sure to load applied mods AFTER initializing profiles
-            // This fixes the issue where mods weren't loading on startup
             await LoadAppliedModsAsync();
         }
 
-        // Scan for mods for the current game
         private async Task ScanForModsAsync()
         {
             if (_currentGame == null) return;
 
-            // Show loading indicator
             Mouse.OverrideCursor = Cursors.Wait;
 
             try
             {
-                // Clear current mods list
                 _availableModsFlat.Clear();
                 _availableModsCategories.Clear();
 
-                // Ensure the TreeView is not visible while loading
                 AvailableModsTreeView.Visibility = Visibility.Collapsed;
 
-                // Scan for mods
                 var mods = await _modDetectionService.ScanForModsAsync(_currentGame);
 
-                // Add mods to flat collection first
                 foreach (var mod in mods)
                 {
                     _availableModsFlat.Add(mod);
                 }
 
-                // Group mods by category
                 var categorizedMods = _availableModsFlat.GroupByCategory();
 
-                // Debug information to verify categories
                 System.Diagnostics.Debug.WriteLine($"Found {categorizedMods.Count} categories:");
                 foreach (var category in categorizedMods)
                 {
@@ -565,22 +458,16 @@ namespace AMO_Launcher
                     }
                 }
 
-                // Important: Replace the collection instead of modifying it
                 _availableModsCategories = categorizedMods;
 
-                // Force the TreeView to refresh completely
                 AvailableModsTreeView.ItemsSource = null;
                 AvailableModsTreeView.ItemsSource = _availableModsCategories;
 
-
-                // Update UI based on results
                 if (_availableModsFlat.Count > 0)
                 {
-                    // Show the TreeView if we found mods
                     AvailableModsTreeView.Visibility = Visibility.Visible;
                 }
 
-                // Load applied mods after loading available mods
                 await LoadAppliedModsAsync();
             }
             catch (Exception ex)
@@ -590,19 +477,16 @@ namespace AMO_Launcher
             }
             finally
             {
-                // Hide loading indicator
                 Mouse.OverrideCursor = null;
             }
         }
 
-        // Load the applied mods list
         private async Task LoadAppliedModsAsync()
         {
             try
             {
                 App.LogToFile("Loading applied mods");
 
-                // Clear current applied mods
                 _appliedMods.Clear();
 
                 if (_currentGame == null)
@@ -612,17 +496,14 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Get normalized game ID
                 string normalizedGameId = GetNormalizedCurrentGameId();
                 App.LogToFile($"Loading mods for normalized game ID: {normalizedGameId}");
 
-                // If we have a valid active profile, try to load its mods
                 if (_activeProfile != null && _activeProfile.AppliedMods != null)
                 {
                     App.LogToFile($"Loading mods from active profile: {_activeProfile.Name} (ID: {_activeProfile.Id})");
                     App.LogToFile($"Profile has {_activeProfile.AppliedMods.Count} mods");
 
-                    // Only load from profile if it actually has mods
                     if (_activeProfile.AppliedMods.Count > 0)
                     {
                         LoadAppliedModsFromProfile(_activeProfile);
@@ -638,11 +519,8 @@ namespace AMO_Launcher
                     App.LogToFile("No active profile or profile has no mods list");
                 }
 
-                // Fallback to using saved mods from ConfigService for backward compatibility
-                // Try both normalized and non-normalized game IDs
                 var appliedModSettings = _configService.GetAppliedMods(normalizedGameId);
 
-                // If no mods found with normalized ID, try the original ID
                 if ((appliedModSettings == null || appliedModSettings.Count == 0) && normalizedGameId != _currentGame.Id)
                 {
                     App.LogToFile($"No mods found with normalized ID, trying original ID: {_currentGame.Id}");
@@ -658,19 +536,16 @@ namespace AMO_Launcher
 
                 App.LogToFile($"Found {appliedModSettings.Count} mods in config service");
 
-                // For each saved mod, find the corresponding mod in available mods
                 foreach (var setting in appliedModSettings)
                 {
                     try
                     {
-                        // First try to find mod in available mods
                         var mod = _availableModsFlat.FirstOrDefault(m =>
                             m.ModFolderPath == setting.ModFolderPath ||
                             (m.IsFromArchive && m.ArchiveSource == setting.ArchiveSource));
 
                         if (mod != null)
                         {
-                            // Set properties and add to applied mods
                             mod.IsApplied = true;
                             mod.IsActive = setting.IsActive;
                             _appliedMods.Add(mod);
@@ -679,7 +554,6 @@ namespace AMO_Launcher
                         else if (setting.IsFromArchive && !string.IsNullOrEmpty(setting.ArchiveSource))
                         {
                             App.LogToFile($"Trying to load archive mod: {setting.ArchiveSource}");
-                            // Try to load from archive directly
                             var archiveMod = await _modDetectionService.LoadModFromArchivePathAsync(
                                 setting.ArchiveSource, _currentGame.Name, setting.ArchiveRootPath);
 
@@ -694,7 +568,6 @@ namespace AMO_Launcher
                         else if (!string.IsNullOrEmpty(setting.ModFolderPath))
                         {
                             App.LogToFile($"Trying to load folder mod: {setting.ModFolderPath}");
-                            // Try to load from folder directly
                             var folderMod = _modDetectionService.LoadModFromFolderPath(setting.ModFolderPath, _currentGame.Name);
 
                             if (folderMod != null)
@@ -709,19 +582,15 @@ namespace AMO_Launcher
                     catch (Exception ex)
                     {
                         App.LogToFile($"Error adding mod: {ex.Message}");
-                        // Continue with next mod
                     }
                 }
 
-                // Show or hide ListView based on whether we have applied mods
                 AppliedModsListView.Visibility = _appliedMods.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-                // Now update mod priorities
                 UpdateModPriorities();
                 UpdateModPriorityDisplays();
                 DetectModConflicts();
 
-                // Also save these mods to the active profile so they're available next time
                 if (_activeProfile != null && _appliedMods.Count > 0)
                 {
                     App.LogToFile("Saving applied mods to active profile for future use");
@@ -736,13 +605,11 @@ namespace AMO_Launcher
             }
         }
 
-        // Refresh mods button click handler
         private async void RefreshModsButton_Click(object sender, RoutedEventArgs e)
         {
             await ScanForModsAsync();
         }
 
-        // Helper method to safely extract icon
         private BitmapImage TryExtractIcon(string executablePath)
         {
             try
@@ -750,7 +617,6 @@ namespace AMO_Launcher
                 if (string.IsNullOrEmpty(executablePath) || !File.Exists(executablePath))
                     return null;
 
-                // Use a direct method without GameDetectionService
                 var icon = System.Drawing.Icon.ExtractAssociatedIcon(executablePath);
                 if (icon == null)
                     return null;
@@ -780,41 +646,31 @@ namespace AMO_Launcher
             }
         }
 
-        // Show UI for when no game is selected
         private void ShowNoGameSelectedUI()
         {
             _currentGame = null;
 
-            // Update UI
             CurrentGameTextBlock.Text = "No game selected";
 
-            // Keep game content panel visible, but could update it to show a message
             GameContentPanel.Visibility = Visibility.Visible;
 
-            // Clear mods list
             _availableModsFlat.Clear();
             AvailableModsTreeView.Visibility = Visibility.Collapsed;
 
-            // Clear applied mods list
             _appliedMods.Clear();
             AppliedModsListView.Visibility = Visibility.Collapsed;
         }
 
-        // Add mod to applied mods collection
-        // Update AddModToApplied method
         private void AddModToApplied(ModInfo mod)
         {
-            // Skip if null
             if (mod == null) return;
 
-            // Show loading cursor
             Mouse.OverrideCursor = Cursors.Wait;
 
             try
             {
                 App.LogToFile($"Adding mod to applied list: {mod.Name}");
 
-                // Check if mod is already in the applied list (compare using absolute paths)
                 string modPath = mod.IsFromArchive ? mod.ArchiveSource : mod.ModFolderPath;
                 string absoluteModPath = PathUtility.ToAbsolutePath(modPath);
 
@@ -826,26 +682,20 @@ namespace AMO_Launcher
                 {
                     App.LogToFile($"Mod not in applied list, adding it");
 
-                    // Mark the mod as applied and active
                     mod.IsApplied = true;
                     mod.IsActive = true;
 
-                    // Add to applied mods collection
                     _appliedMods.Add(mod);
                     UpdateModPriorities();
                     UpdateModPriorityDisplays();
 
-                    // Ensure the ListView is visible
                     AppliedModsListView.Visibility = Visibility.Visible;
 
-                    // Mark that changes need to be applied
                     _configService.MarkModsChanged();
 
-                    // Log paths for debugging
                     App.LogToFile($"Original mod path: {modPath}");
                     App.LogToFile($"Relative path: {PathUtility.ToRelativePath(modPath)}");
 
-                    // Save applied mods list without blocking UI
                     SaveAppliedMods();
                     DetectModConflicts();
                 }
@@ -861,23 +711,17 @@ namespace AMO_Launcher
             }
             finally
             {
-                // Clear loading cursor
                 Mouse.OverrideCursor = null;
             }
         }
 
-        // Update ActiveCheckBox_CheckChanged method
         private void ActiveCheckBox_CheckChanged(object sender, RoutedEventArgs e)
         {
-            // Mark that changes need to be applied
             _configService.MarkModsChanged();
-
-            // Save applied mods list without blocking UI thread
             SaveAppliedMods();
             DetectModConflicts();
         }
 
-        // Update ModActionButton_Click method (if you want to modify it)
         private void ModActionButton_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
@@ -913,10 +757,8 @@ namespace AMO_Launcher
             }
         }
 
-        // Update RemoveSelectedAppliedMods method
         private void RemoveSelectedAppliedMods()
         {
-            // Show loading cursor
             Mouse.OverrideCursor = Cursors.Wait;
 
             try
@@ -938,26 +780,20 @@ namespace AMO_Launcher
                     UpdateModPriorityDisplays();
                 }
 
-                // Hide ListView if no mods left
                 if (_appliedMods.Count == 0)
                 {
                     AppliedModsListView.Visibility = Visibility.Collapsed;
                 }
 
-                // Mark that changes need to be applied
                 _configService.MarkModsChanged();
-
-                // Save changes without blocking UI
                 SaveAppliedMods();
             }
             finally
             {
-                // Clear loading cursor
                 Mouse.OverrideCursor = null;
             }
         }
 
-        // Update all Move methods
         private void MoveSelectedModToTop()
         {
             if (AppliedModsListView.SelectedItem is ModInfo selectedMod)
@@ -1026,7 +862,6 @@ namespace AMO_Launcher
             }
         }
 
-        // Save the current applied mods list asynchronously
         private async Task SaveAppliedModsAsync()
         {
             try
@@ -1037,7 +872,6 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Create a list of applied mod settings with relative paths
                 var appliedModSettings = _appliedMods.Select(m => new AppliedModSetting
                 {
                     ModFolderPath = m.IsFromArchive ? null : PathUtility.ToRelativePath(m.ModFolderPath),
@@ -1047,26 +881,21 @@ namespace AMO_Launcher
                     ArchiveRootPath = m.ArchiveRootPath
                 }).ToList();
 
-                // Log what we're saving
                 App.LogToFile($"Saving {appliedModSettings.Count} mods for game {_currentGame.Name}");
                 foreach (var mod in appliedModSettings)
                 {
                     App.LogToFile($"  Saving mod path: {(mod.IsFromArchive ? mod.ArchiveSource : mod.ModFolderPath)}");
                 }
 
-                // Get normalized game ID
                 string normalizedGameId = GetNormalizedCurrentGameId();
 
-                // Save to both normalized and original game IDs in the config service
                 await _configService.SaveAppliedModsAsync(normalizedGameId, appliedModSettings);
 
-                // If the IDs are different, also save with the original ID
                 if (normalizedGameId != _currentGame.Id)
                 {
                     await _configService.SaveAppliedModsAsync(_currentGame.Id, appliedModSettings);
                 }
 
-                // Update the active profile directly
                 if (_activeProfile != null)
                 {
                     _activeProfile.AppliedMods = new List<AppliedModSetting>(appliedModSettings);
@@ -1074,7 +903,6 @@ namespace AMO_Launcher
                     App.LogToFile($"Updated active profile '{_activeProfile.Name}' with {appliedModSettings.Count} mods");
                 }
 
-                // Save to profile service (which will also update the active profile in storage)
                 await _profileService.UpdateActiveProfileModsAsync(normalizedGameId, appliedModSettings);
 
                 App.LogToFile("Mods saved successfully");
@@ -1086,14 +914,11 @@ namespace AMO_Launcher
             }
         }
 
-        // Non-blocking wrapper method for event handlers
         private void SaveAppliedMods()
         {
-            // Run the async method without awaiting it
             Task.Run(async () => await SaveAppliedModsAsync()).ConfigureAwait(false);
         }
 
-        // Launch Game button click handler
         private async void LaunchGameButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentGame == null)
@@ -1105,23 +930,17 @@ namespace AMO_Launcher
 
             try
             {
-                // Show loading cursor
                 Mouse.OverrideCursor = Cursors.Wait;
 
-                // Log the operation
                 System.Diagnostics.Debug.WriteLine($"Launching game: {_currentGame.Name}");
 
-                // Check if mods need to be applied and apply them
                 await CheckAndApplyModsAsync();
 
-                // Launch the game
                 System.Diagnostics.Debug.WriteLine($"Starting process: {_currentGame.ExecutablePath}");
                 Process.Start(_currentGame.ExecutablePath);
 
-                // Reset the flag if game launches successfully
                 _configService.ResetModsChangedFlag();
 
-                // Minimize the launcher
                 this.WindowState = WindowState.Minimized;
             }
             catch (Exception ex)
@@ -1131,15 +950,12 @@ namespace AMO_Launcher
             }
             finally
             {
-                // Clear loading cursor
                 Mouse.OverrideCursor = null;
             }
         }
 
-        // Check if mods need to be applied and apply them
         private async Task CheckAndApplyModsAsync()
         {
-            // Skip for F1 Manager games
             if (_currentGame.Name.Contains("Manager"))
             {
                 return;
@@ -1147,7 +963,6 @@ namespace AMO_Launcher
 
             try
             {
-                // Get current active mods
                 var currentActiveMods = _appliedMods.Where(m => m.IsActive)
                     .Select(m => new AppliedModSetting
                     {
@@ -1159,17 +974,14 @@ namespace AMO_Launcher
                     })
                     .ToList();
 
-                // Check if mods have changed since last application
                 bool modsChanged = _configService.HaveModsChanged(_currentGame.Id, currentActiveMods);
 
-                // If mods haven't changed, skip file operations
                 if (!modsChanged)
                 {
                     System.Diagnostics.Debug.WriteLine("No changes detected in mods - launching game without file operations");
                     return;
                 }
 
-                // Show a progress window for the file operations
                 var progressWindow = new Views.BackupProgressWindow();
                 progressWindow.Owner = this;
                 progressWindow.SetGame(_currentGame);
@@ -1178,10 +990,8 @@ namespace AMO_Launcher
 
                 try
                 {
-                    // Check if we have any active mods
                     bool hasActiveMods = currentActiveMods.Count > 0;
 
-                    // Initialize progress window with appropriate message
                     progressWindow.UpdateProgress(0, hasActiveMods ?
                         "Preparing to apply mods..." :
                         "Restoring original game files...");
@@ -1189,7 +999,6 @@ namespace AMO_Launcher
                     string gameInstallDir = _currentGame.InstallDirectory;
                     string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
 
-                    // Check if backup directory exists
                     if (!Directory.Exists(backupDir))
                     {
                         progressWindow.ShowError("Original game data backup not found. Please reset your game data from the Settings window.");
@@ -1197,27 +1006,24 @@ namespace AMO_Launcher
                         return;
                     }
 
-                    // Always restore original game files first
                     await Task.Run(() =>
                     {
                         progressWindow.UpdateProgress(0.2, "Restoring original game files...");
                         CopyDirectoryContents(backupDir, gameInstallDir);
                     });
 
-                    // If no active mods, we're done
                     if (!hasActiveMods)
                     {
                         progressWindow.UpdateProgress(0.9, "Game restored to original state and ready to launch!");
                     }
                     else
                     {
-                        // Apply each active mod in order
                         var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
 
                         for (int i = 0; i < activeMods.Count; i++)
                         {
                             var mod = activeMods[i];
-                            double progress = 0.2 + (i * 0.7 / activeMods.Count); // Scale from 20% to 90%
+                            double progress = 0.2 + (i * 0.7 / activeMods.Count);
 
                             progressWindow.UpdateProgress(progress, $"Applying mod ({i + 1}/{activeMods.Count}): {mod.Name}");
 
@@ -1237,15 +1043,12 @@ namespace AMO_Launcher
                         progressWindow.UpdateProgress(0.95, "All mods applied successfully!");
                     }
 
-                    // Save the last applied mods state and reset the changed flag
-                    // Use the async version and wait for it to complete
                     _configService.SaveLastAppliedModsState(_currentGame.Id, currentActiveMods);
                     System.Diagnostics.Debug.WriteLine($"After save, checking if state exists: {_configService.GetLastAppliedModsState(_currentGame.Id) != null}");
                     _configService.ResetModsChangedFlag();
 
-                    // Final message
                     progressWindow.UpdateProgress(1.0, "Ready to launch game!");
-                    await Task.Delay(1000); // Brief delay to show completion message
+                    await Task.Delay(1000);
                 }
                 catch (Exception ex)
                 {
@@ -1255,7 +1058,6 @@ namespace AMO_Launcher
                 }
                 finally
                 {
-                    // Close the progress window
                     Application.Current.Dispatcher.Invoke(() => { progressWindow.Close(); });
                 }
             }
@@ -1271,360 +1073,15 @@ namespace AMO_Launcher
             int count = _appliedMods.Count;
             for (int i = 0; i < count; i++)
             {
-                // Set priority where 1 is highest (bottom of list)
                 _appliedMods[i].Priority = count - i;
             }
             AppliedModsListView.Items.Refresh();
         }
 
-        // Reset game files to original state with shared progress window
-        private async Task ResetToOriginalGameDataWithProgressAsync(Views.BackupProgressWindow progressWindow)
-        {
-            string gameInstallDir = _currentGame.InstallDirectory;
-            string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
-
-            // Skip for Manager games or if backup doesn't exist
-            if (_currentGame.Name.Contains("Manager") || !Directory.Exists(backupDir))
-            {
-                return;
-            }
-
-            // Check if there are active mods
-            if (_appliedMods.Any(m => m.IsActive))
-            {
-                // We have active mods, will copy files later
-                return;
-            }
-
-            // No active mods, restore original game data
-            progressWindow.UpdateProgress(0.2, "Restoring original game files before launch...");
-
-            try
-            {
-                await Task.Run(() =>
-                {
-                    // Copy files from backup to game directory
-                    CopyDirectoryContents(backupDir, gameInstallDir, progressWindow);
-                });
-
-                progressWindow.UpdateProgress(0.9, "Game restored to original state and ready to launch!");
-            }
-            catch (Exception ex)
-            {
-                progressWindow.ShowError($"Error restoring original game data: {ex.Message}");
-                await Task.Delay(3000); // Longer delay to show error
-                throw;
-            }
-        }
-
-        // Apply mods to the game with shared progress window
-        private async Task ApplyModsToGameWithProgressAsync(Views.BackupProgressWindow progressWindow)
-        {
-            // Get active mods in the correct order
-            var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
-
-            if (activeMods.Count == 0) return;
-
-            // First, reset to original game data by copying files
-            string gameInstallDir = _currentGame.InstallDirectory;
-            string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
-
-            // Skip if backup doesn't exist
-            if (!Directory.Exists(backupDir))
-            {
-                progressWindow.ShowError("Original game data backup not found. Please reset your game data from the Settings window.");
-                await Task.Delay(3000);
-                throw new Exception("Original game data backup not found");
-            }
-
-            try
-            {
-                // First restore original game files
-                progressWindow.UpdateProgress(0.1, "Preparing game for modding...");
-
-                await Task.Run(() =>
-                {
-                    // Copy files from backup to game directory
-                    CopyDirectoryContents(backupDir, gameInstallDir, progressWindow);
-                });
-
-                // Apply each mod in order
-                for (int i = 0; i < activeMods.Count; i++)
-                {
-                    var mod = activeMods[i];
-                    double progress = 0.2 + (i * 0.7 / activeMods.Count); // Scale from 20% to 90%
-
-                    // Update progress
-                    progressWindow.UpdateProgress(progress, $"Applying mod ({i + 1}/{activeMods.Count}): {mod.Name}");
-
-                    await Task.Run(() =>
-                    {
-                        if (mod.IsFromArchive)
-                        {
-                            // Apply mod from archive
-                            ApplyModFromArchive(mod, gameInstallDir);
-                        }
-                        else
-                        {
-                            // Apply mod from folder
-                            string modFilesPath = mod.ModFilesPath;
-                            if (Directory.Exists(modFilesPath))
-                            {
-                                CopyDirectoryContents(modFilesPath, gameInstallDir, progressWindow);
-                            }
-                        }
-                    });
-                }
-
-                // Complete progress
-                progressWindow.UpdateProgress(0.95, "All mods applied successfully!");
-            }
-            catch (Exception ex)
-            {
-                progressWindow.ShowError($"Error applying mods: {ex.Message}");
-                await Task.Delay(3000); // Longer delay to show error
-                throw;
-            }
-        }
-
-        // Check if the applied mods have changed since last application
-        private async Task<bool> HaveModsChangedAsync()
-        {
-            // Get the last applied mods state
-            var lastAppliedState = await Task.Run(() => _configService.GetLastAppliedModsState(_currentGame.Id));
-
-            // If no last state, then mods have changed
-            if (lastAppliedState == null || lastAppliedState.Count == 0) return true;
-
-            // Get current active mods
-            var currentActiveMods = _appliedMods.Where(m => m.IsActive)
-                .Select(m => new AppliedModSetting
-                {
-                    ModFolderPath = m.ModFolderPath,
-                    IsFromArchive = m.IsFromArchive,
-                    ArchiveSource = m.ArchiveSource,
-                    ArchiveRootPath = m.ArchiveRootPath
-                })
-                .ToList();
-
-            // If count is different, mods have changed
-            if (currentActiveMods.Count != lastAppliedState.Count) return true;
-
-            // Check if each mod in current state matches last state
-            for (int i = 0; i < currentActiveMods.Count; i++)
-            {
-                var currentMod = currentActiveMods[i];
-                var lastMod = lastAppliedState[i];
-
-                // If different mod or different order, mods have changed
-                if (currentMod.ModFolderPath != lastMod.ModFolderPath ||
-                    currentMod.IsFromArchive != lastMod.IsFromArchive ||
-                    currentMod.ArchiveSource != lastMod.ArchiveSource ||
-                    currentMod.ArchiveRootPath != lastMod.ArchiveRootPath)
-                {
-                    return true;
-                }
-            }
-
-            // No differences found
-            return false;
-        }
-
-        // Check if the applied mods have changed since last application
-        private bool HaveModsChanged()
-        {
-            try
-            {
-                // Get the last applied mods state
-                var lastAppliedState = _configService.GetLastAppliedModsState(_currentGame.Id);
-
-                // If no last state, then mods have changed
-                if (lastAppliedState == null || lastAppliedState.Count == 0)
-                    return true;
-
-                // Get current active mods
-                var currentActiveMods = _appliedMods.Where(m => m.IsActive)
-                    .Select(m => new AppliedModSetting
-                    {
-                        ModFolderPath = m.ModFolderPath,
-                        IsFromArchive = m.IsFromArchive,
-                        ArchiveSource = m.ArchiveSource,
-                        ArchiveRootPath = m.ArchiveRootPath
-                    })
-                    .ToList();
-
-                // If count is different, mods have changed
-                if (currentActiveMods.Count != lastAppliedState.Count)
-                    return true;
-
-                // Check if each mod in current state matches last state
-                for (int i = 0; i < currentActiveMods.Count; i++)
-                {
-                    var currentMod = currentActiveMods[i];
-                    var lastMod = lastAppliedState[i];
-
-                    // If different mod or different order, mods have changed
-                    if (currentMod.ModFolderPath != lastMod.ModFolderPath ||
-                        currentMod.IsFromArchive != lastMod.IsFromArchive ||
-                        currentMod.ArchiveSource != lastMod.ArchiveSource ||
-                        currentMod.ArchiveRootPath != lastMod.ArchiveRootPath)
-                    {
-                        return true;
-                    }
-                }
-
-                // No differences found
-                return false;
-            }
-            catch (Exception ex)
-            {
-                // If any error occurs, assume mods have changed to be safe
-                System.Diagnostics.Debug.WriteLine($"Error checking mod changes: {ex.Message}");
-                return true;
-            }
-        }
-
-        // Reset game files to original state
-        private async Task ResetToOriginalGameDataAsync()
-        {
-            string gameInstallDir = _currentGame.InstallDirectory;
-            string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
-
-            // Skip for Manager games or if backup doesn't exist
-            if (_currentGame.Name.Contains("Manager") || !Directory.Exists(backupDir))
-            {
-                return;
-            }
-
-            // Check if there are active mods
-            if (_appliedMods.Any(m => m.IsActive))
-            {
-                // We have active mods, will copy files later
-                return;
-            }
-
-            // No active mods, restore original game data
-
-            // Show progress dialog
-            var progressWindow = new Views.BackupProgressWindow();
-            progressWindow.Owner = this;
-            progressWindow.SetGame(_currentGame);
-            progressWindow.Show();
-            progressWindow.UpdateProgress(0, "Restoring original game files...");
-
-            try
-            {
-                await Task.Run(() =>
-                {
-                    // Copy files from backup to game directory
-                    CopyDirectoryContents(backupDir, gameInstallDir, progressWindow);
-                });
-
-                progressWindow.UpdateProgress(1.0, "Game restored to original state!");
-                await Task.Delay(1000); // Brief delay to show completion
-            }
-            catch (Exception ex)
-            {
-                progressWindow.ShowError($"Error restoring original game data: {ex.Message}");
-                await Task.Delay(3000); // Longer delay to show error
-                throw;
-            }
-            finally
-            {
-                // Close progress dialog
-                progressWindow.Close();
-            }
-        }
-
-        // Apply mods to the game
-        private async Task ApplyModsToGameAsync()
-        {
-            // Get active mods in the correct order
-            var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
-
-            if (activeMods.Count == 0) return;
-
-            // First, reset to original game data by copying files
-            string gameInstallDir = _currentGame.InstallDirectory;
-            string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
-
-            // Skip if backup doesn't exist
-            if (!Directory.Exists(backupDir))
-            {
-                MessageBox.Show("Original game data backup not found. Please reset your game data from the Settings window.",
-                    "Backup Missing", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // Show progress dialog
-            var progressWindow = new Views.BackupProgressWindow();
-            progressWindow.Owner = this;
-            progressWindow.SetGame(_currentGame);
-            progressWindow.Show();
-
-            try
-            {
-                // First restore original game files
-                progressWindow.UpdateProgress(0, "Restoring original game files...");
-
-                await Task.Run(() =>
-                {
-                    // Copy files from backup to game directory
-                    CopyDirectoryContents(backupDir, gameInstallDir, progressWindow);
-                });
-
-                // Apply each mod in order
-                for (int i = 0; i < activeMods.Count; i++)
-                {
-                    var mod = activeMods[i];
-                    double progress = (i * 0.8 / activeMods.Count) + 0.2; // Scale from 20% to 100%
-
-                    // Update progress
-                    progressWindow.UpdateProgress(progress, $"Applying mod: {mod.Name}");
-
-                    await Task.Run(() =>
-                    {
-                        if (mod.IsFromArchive)
-                        {
-                            // Apply mod from archive
-                            ApplyModFromArchive(mod, gameInstallDir);
-                        }
-                        else
-                        {
-                            // Apply mod from folder
-                            string modFilesPath = mod.ModFilesPath;
-                            if (Directory.Exists(modFilesPath))
-                            {
-                                CopyDirectoryContents(modFilesPath, gameInstallDir, progressWindow);
-                            }
-                        }
-                    });
-                }
-
-                // Complete progress
-                progressWindow.UpdateProgress(1.0, "Mods applied successfully!");
-                await Task.Delay(1000); // Brief delay to show completion
-            }
-            catch (Exception ex)
-            {
-                progressWindow.ShowError($"Error applying mods: {ex.Message}");
-                await Task.Delay(3000); // Longer delay to show error
-                throw;
-            }
-            finally
-            {
-                // Close progress dialog
-                progressWindow.Close();
-            }
-        }
-
-        // Copy directory contents recursively
         private void CopyDirectoryContents(string sourceDir, string targetDir, Views.BackupProgressWindow progressWindow = null)
         {
-            // Create target directory if it doesn't exist
             Directory.CreateDirectory(targetDir);
 
-            // Copy files
             foreach (string file in Directory.GetFiles(sourceDir))
             {
                 string fileName = Path.GetFileName(file);
@@ -1632,7 +1089,6 @@ namespace AMO_Launcher
                 File.Copy(file, destFile, true);
             }
 
-            // Copy subdirectories
             foreach (string directory in Directory.GetDirectories(sourceDir))
             {
                 string dirName = Path.GetFileName(directory);
@@ -1641,10 +1097,8 @@ namespace AMO_Launcher
             }
         }
 
-        // Apply mod from archive
         private void ApplyModFromArchive(ModInfo mod, string targetDir)
         {
-            // Skip if no archive source
             if (string.IsNullOrEmpty(mod.ArchiveSource) || !File.Exists(mod.ArchiveSource))
             {
                 return;
@@ -1652,7 +1106,6 @@ namespace AMO_Launcher
 
             using (var archive = SharpCompress.Archives.ArchiveFactory.Open(mod.ArchiveSource))
             {
-                // Get the mod files path within the archive
                 string modPath = mod.ArchiveRootPath;
                 if (!string.IsNullOrEmpty(modPath))
                 {
@@ -1664,27 +1117,22 @@ namespace AMO_Launcher
                     modPath = "Mod";
                 }
 
-                // Extract files to target directory
                 foreach (var entry in archive.Entries)
                 {
                     if (entry.IsDirectory) continue;
 
-                    // Check if this entry is in the Mod folder
                     string entryKey = entry.Key.Replace('\\', '/');
                     if (entryKey.StartsWith(modPath + "/", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Get the relative path within the Mod folder
                         string relativePath = entryKey.Substring(modPath.Length + 1);
                         string targetPath = Path.Combine(targetDir, relativePath);
 
-                        // Create directory if needed
                         string targetDirPath = Path.GetDirectoryName(targetPath);
                         if (!Directory.Exists(targetDirPath))
                         {
                             Directory.CreateDirectory(targetDirPath);
                         }
 
-                        // Extract the file
                         using (var entryStream = entry.OpenEntryStream())
                         using (var fileStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write))
                         {
@@ -1692,51 +1140,6 @@ namespace AMO_Launcher
                         }
                     }
                 }
-            }
-        }
-
-        // Save the last applied mods state
-        private void SaveLastAppliedModsState()
-        {
-            if (_currentGame == null) return;
-
-            var activeMods = _appliedMods.Where(m => m.IsActive)
-                .Select(m => new AppliedModSetting
-                {
-                    ModFolderPath = m.ModFolderPath,
-                    IsActive = true,
-                    IsFromArchive = m.IsFromArchive,
-                    ArchiveSource = m.ArchiveSource,
-                    ArchiveRootPath = m.ArchiveRootPath
-                })
-                .ToList();
-
-            _configService.SaveLastAppliedModsState(_currentGame.Id, activeMods);
-        }
-
-        // Save the last applied mods state
-        private async Task SaveLastAppliedModsStateAsync()
-        {
-            if (_currentGame == null) return;
-
-            try
-            {
-                var activeMods = _appliedMods.Where(m => m.IsActive)
-                    .Select(m => new AppliedModSetting
-                    {
-                        ModFolderPath = m.ModFolderPath,
-                        IsActive = true,
-                        IsFromArchive = m.IsFromArchive,
-                        ArchiveSource = m.ArchiveSource,
-                        ArchiveRootPath = m.ArchiveRootPath
-                    })
-                    .ToList();
-
-                await Task.Run(() => _configService.SaveLastAppliedModsState(_currentGame.Id, activeMods));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error saving last applied mods state: {ex.Message}");
             }
         }
 
@@ -1768,27 +1171,6 @@ namespace AMO_Launcher
             }
         }
 
-        private async Task EnsureGameBackupAsync(GameInfo game)
-        {
-            // Skip for Manager games
-            if (game?.Name?.Contains("Manager") == true)
-            {
-                return;
-            }
-
-            // Check for Original_GameData backup
-            bool backupReady = await _gameBackupService.EnsureOriginalGameDataBackupAsync(game);
-            if (!backupReady)
-            {
-                // User cancelled backup creation
-                MessageBox.Show(
-                    "Game backup was not created. Some mod features may be limited or not work correctly.",
-                    "Backup Not Created",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-        }
-
         public GameInfo GetCurrentGame()
         {
             return _currentGame;
@@ -1799,15 +1181,12 @@ namespace AMO_Launcher
             int count = _appliedMods.Count;
             for (int i = 0; i < count; i++)
             {
-                // Set priority where 1 is highest (bottom of list)
                 _appliedMods[i].PriorityDisplay = (count - i).ToString();
             }
         }
 
-        // Handle delete mod context menu click
         private void DeleteMod_Click(object sender, RoutedEventArgs e)
         {
-            // Determine which control the context menu was opened from
             var menuItem = sender as MenuItem;
             if (menuItem == null) return;
 
@@ -1817,19 +1196,15 @@ namespace AMO_Launcher
             var treeView = contextMenu.PlacementTarget as TreeView;
             if (treeView == null) return;
 
-            // Get the selected item (could be category or mod)
             var selectedItem = treeView.SelectedItem;
             if (selectedItem == null) return;
 
-            // Handle deletion based on selection type
             if (selectedItem is ModInfo selectedMod)
             {
-                // Handle mod deletion
                 DeleteModItem(selectedMod);
             }
             else if (selectedItem is ModCategory category)
             {
-                // Confirm deletion of entire category
                 var result = MessageBox.Show(
                     $"Are you sure you want to delete ALL mods in the '{category.Name}' category?\n\nThis action cannot be undone.",
                     "Confirm Category Deletion",
@@ -1838,10 +1213,8 @@ namespace AMO_Launcher
 
                 if (result != MessageBoxResult.Yes) return;
 
-                // Create a copy of the mods list to avoid modification issues
                 var modsToDelete = category.Mods.ToList();
 
-                // Delete each mod in the category
                 foreach (var mod in modsToDelete)
                 {
                     DeleteModItem(mod);
@@ -1849,7 +1222,6 @@ namespace AMO_Launcher
             }
         }
 
-        // Deactivate all mods context menu click handler
         private void DeactivateAllMods_Click(object sender, RoutedEventArgs e)
         {
             if (_appliedMods.Count == 0)
@@ -1867,82 +1239,15 @@ namespace AMO_Launcher
 
             if (result != MessageBoxResult.Yes) return;
 
-            // Deactivate all mods
             Mouse.OverrideCursor = Cursors.Wait;
 
             try
             {
-                // Set all mods to inactive
                 foreach (var mod in _appliedMods)
                 {
                     mod.IsActive = false;
                 }
 
-                // Mark changes for saving
-                _configService.MarkModsChanged();
-                SaveAppliedMods();
-
-                // Removed the message box that said "All mods have been deactivated."
-            }
-            finally
-            {
-                Mouse.OverrideCursor = null;
-            }
-        }
-
-
-        // Helper method to actually delete the mod files
-        private void DeleteMods(List<ModInfo> mods)
-        {
-            Mouse.OverrideCursor = Cursors.Wait;
-
-            try
-            {
-                foreach (var mod in mods)
-                {
-                    try
-                    {
-                        // Check if the mod is from an archive
-                        if (mod.IsFromArchive)
-                        {
-                            // Delete the archive file
-                            if (!string.IsNullOrEmpty(mod.ArchiveSource) && File.Exists(mod.ArchiveSource))
-                            {
-                                File.Delete(mod.ArchiveSource);
-                            }
-                        }
-                        else
-                        {
-                            // Delete the mod folder
-                            if (!string.IsNullOrEmpty(mod.ModFolderPath) && Directory.Exists(mod.ModFolderPath))
-                            {
-                                Directory.Delete(mod.ModFolderPath, true);
-                            }
-                        }
-
-                        // Remove the mod from the available mods list
-                        _availableModsFlat.Remove(mod);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Error deleting mod '{mod.Name}': {ex.Message}", "Delete Error",
-                            MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
-
-                // Update UI if all available mods are deleted
-                if (_availableModsFlat.Count == 0)
-                {
-                    AvailableModsTreeView.Visibility = Visibility.Collapsed;
-                }
-
-                // Also hide applied mods list if empty
-                if (_appliedMods.Count == 0)
-                {
-                    AppliedModsListView.Visibility = Visibility.Collapsed;
-                }
-
-                // Mark that changes need to be applied
                 _configService.MarkModsChanged();
                 SaveAppliedMods();
             }
@@ -1952,40 +1257,30 @@ namespace AMO_Launcher
             }
         }
 
-        // Handle double-click on applied mods to remove them from the list
         private void AppliedModsListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            // Get the item that was clicked
             DependencyObject originalSource = (DependencyObject)e.OriginalSource;
             while (originalSource != null && !(originalSource is ListViewItem))
             {
                 originalSource = VisualTreeHelper.GetParent(originalSource);
             }
 
-            // Make sure we clicked on an actual item
             if (originalSource is ListViewItem)
             {
-                // Get the mod that was clicked
                 if (AppliedModsListView.SelectedItem is ModInfo selectedMod)
                 {
-                    // Remove the mod from applied mods without confirmation
                     selectedMod.IsApplied = false;
                     _appliedMods.Remove(selectedMod);
-
-                    // Update priorities and UI
                     UpdateModPriorities();
                     UpdateModPriorityDisplays();
 
-                    // Hide ListView if no mods left
                     if (_appliedMods.Count == 0)
                     {
                         AppliedModsListView.Visibility = Visibility.Collapsed;
                     }
 
-                    // Mark that changes need to be applied
                     _configService.MarkModsChanged();
 
-                    // Save changes
                     SaveAppliedMods();
                 }
             }
@@ -1993,27 +1288,22 @@ namespace AMO_Launcher
 
         private List<ModFileConflict> _modConflicts = new List<ModFileConflict>();
 
-        // Detects conflicts between active mods
         private void DetectModConflicts()
         {
             _modConflicts.Clear();
 
-            // Get all active mods
             var activeMods = _appliedMods.Where(m => m.IsActive).ToList();
 
-            // If there are less than 2 active mods, there can't be any conflicts
             if (activeMods.Count < 2)
             {
                 UpdateConflictsListView();
                 return;
             }
 
-            // Dictionary to track which mods modify which files
             var fileToModsMap = new Dictionary<string, List<ModInfo>>();
 
             foreach (var mod in activeMods)
             {
-                // Get all files this mod modifies
                 var modFiles = GetModFiles(mod);
 
                 foreach (var file in modFiles)
@@ -2026,7 +1316,6 @@ namespace AMO_Launcher
                 }
             }
 
-            // Find conflicts (files modified by more than one mod)
             foreach (var entry in fileToModsMap)
             {
                 if (entry.Value.Count > 1)
@@ -2039,17 +1328,12 @@ namespace AMO_Launcher
                 }
             }
 
-            // Update the UI
             UpdateConflictsListView();
-
-            // Highlight winning mods
             HighlightWinningMods();
         }
 
-        // Updates the conflicts list view with current conflicts
         private void UpdateConflictsListView()
         {
-            // Create a list of conflict items for the UI
             var conflictItems = new List<ConflictItem>();
 
             foreach (var conflict in _modConflicts)
@@ -2064,16 +1348,12 @@ namespace AMO_Launcher
                 }
             }
 
-            // Sort by file path and then by mod name for clearer grouping
             conflictItems = conflictItems.OrderBy(c => c.FilePath).ThenBy(c => c.ModName).ToList();
 
-            // Update the ConflictsListView
             ConflictsListView.ItemsSource = conflictItems;
 
-            // Remove "No conflicts" message if it exists and we have conflicts
             if (conflictItems.Count > 0)
             {
-                // Find and remove the "No conflicts" message if it exists
                 var parent = VisualTreeHelper.GetParent(ConflictsListView) as Grid;
                 if (parent != null)
                 {
@@ -2086,12 +1366,10 @@ namespace AMO_Launcher
                     }
                 }
 
-                // Make sure ListView is visible
                 ConflictsListView.Visibility = Visibility.Visible;
             }
             else
             {
-                // Only hide the ListView if no conflicts were found and we're showing the message
                 var parent = VisualTreeHelper.GetParent(ConflictsListView) as Grid;
                 bool messageExists = false;
 
@@ -2101,7 +1379,6 @@ namespace AMO_Launcher
                         .Any(tb => tb.Name == "NoConflictsMessage");
                 }
 
-                // Only hide if we're showing the message
                 if (messageExists)
                 {
                     ConflictsListView.Visibility = Visibility.Collapsed;
@@ -2112,11 +1389,9 @@ namespace AMO_Launcher
                 }
             }
 
-            // Update badge count on Conflicts tab
             UpdateConflictTabBadge(conflictItems.Count);
         }
 
-        // Get files modified by a mod
         private List<string> GetModFiles(ModInfo mod)
         {
             var files = new List<string>();
@@ -2125,12 +1400,10 @@ namespace AMO_Launcher
             {
                 if (mod.IsFromArchive)
                 {
-                    // Extract file list from archive
                     files = GetFilesFromArchive(mod.ArchiveSource, mod.ArchiveRootPath);
                 }
                 else if (!string.IsNullOrEmpty(mod.ModFilesPath) && Directory.Exists(mod.ModFilesPath))
                 {
-                    // Get files from folder
                     files = GetFilesFromFolder(mod.ModFilesPath);
                 }
             }
@@ -2142,7 +1415,6 @@ namespace AMO_Launcher
             return files;
         }
 
-        // Get files from a mod archive
         private List<string> GetFilesFromArchive(string archivePath, string rootPath)
         {
             var files = new List<string>();
@@ -2171,7 +1443,6 @@ namespace AMO_Launcher
                         string entryKey = entry.Key.Replace('\\', '/');
                         if (entryKey.StartsWith(modPath + "/", StringComparison.OrdinalIgnoreCase))
                         {
-                            // Get the relative path within the Mod folder
                             string relativePath = entryKey.Substring(modPath.Length + 1);
                             files.Add(relativePath);
                         }
@@ -2186,7 +1457,6 @@ namespace AMO_Launcher
             return files;
         }
 
-        // Get files from a mod folder
         private List<string> GetFilesFromFolder(string folderPath)
         {
             var files = new List<string>();
@@ -2212,7 +1482,6 @@ namespace AMO_Launcher
             return files;
         }
 
-        // Update conflict tab with badge showing number of conflicts
         private void UpdateConflictTabBadge(int conflictCount)
         {
             var conflictHeader = ConflictsTab.Header as TextBlock;
@@ -2220,33 +1489,26 @@ namespace AMO_Launcher
             {
                 if (conflictCount > 0)
                 {
-                    // Show count in the header but keep original styling
                     conflictHeader.Text = $"Conflicts ({conflictCount})";
 
-                    // Keep all original styling - no color change
                     conflictHeader.FontWeight = FontWeights.DemiBold;
                 }
                 else
                 {
-                    // Reset to original text
                     conflictHeader.Text = "Conflicts";
 
-                    // Ensure original styling is preserved
                     conflictHeader.FontWeight = FontWeights.DemiBold;
                 }
 
-                // Always ensure the style is applied
                 if (conflictHeader.Style == null)
                 {
                     conflictHeader.Style = FindResource("TabHeaderTextStyle") as Style;
                 }
 
-                // Clear any direct foreground property that might override the style
                 conflictHeader.ClearValue(TextBlock.ForegroundProperty);
             }
         }
 
-        // Show which mod will win in a conflict
         private void HighlightWinningMods()
         {
             if (ConflictsListView.ItemsSource == null) return;
@@ -2254,12 +1516,10 @@ namespace AMO_Launcher
             var conflictItems = ConflictsListView.ItemsSource as List<ConflictItem>;
             if (conflictItems == null || !conflictItems.Any()) return;
 
-            // Group conflicts by file path
             var conflictsByFile = conflictItems.GroupBy(c => c.FilePath).ToList();
 
             foreach (var fileGroup in conflictsByFile)
             {
-                // Find the mod with the highest priority (lowest in list)
                 var winningMod = fileGroup
                     .Select(c => c.Mod)
                     .OrderByDescending(m => _appliedMods.IndexOf(m))
@@ -2267,7 +1527,6 @@ namespace AMO_Launcher
 
                 if (winningMod != null)
                 {
-                    // Mark the winning mod in each conflict group
                     foreach (var item in conflictItems.Where(c => c.FilePath == fileGroup.Key))
                     {
                         item.IsWinningMod = item.Mod == winningMod;
@@ -2275,11 +1534,9 @@ namespace AMO_Launcher
                 }
             }
 
-            // Refresh the ListView to show the highlighting
             ConflictsListView.Items.Refresh();
         }
 
-        // Add context menu to Conflicts tab for navigation to mods
         private void AddConflictsContextMenu()
         {
             var contextMenu = new ContextMenu();
@@ -2304,16 +1561,13 @@ namespace AMO_Launcher
             ConflictsListView.ContextMenu = contextMenu;
         }
 
-        // Jump to the selected mod in the Applied Mods tab
         private void JumpToModMenuItem_Click(object sender, RoutedEventArgs e)
         {
             var selectedItem = ConflictsListView.SelectedItem as ConflictItem;
             if (selectedItem == null || selectedItem.Mod == null) return;
 
-            // Switch to Applied Mods tab
             ModTabControl.SelectedItem = AppliedModsTab;
 
-            // Find and select the mod in the Applied Mods list
             var modInList = _appliedMods.FirstOrDefault(m => m == selectedItem.Mod);
             if (modInList != null)
             {
@@ -2322,7 +1576,6 @@ namespace AMO_Launcher
             }
         }
 
-        // Highlight all items with the same conflicting file path
         private void HighlightConflictingFiles_Click(object sender, RoutedEventArgs e)
         {
             var selectedItem = ConflictsListView.SelectedItem as ConflictItem;
@@ -2330,24 +1583,18 @@ namespace AMO_Launcher
 
             string filePath = selectedItem.FilePath;
 
-            // Find all items with the same file path
             foreach (var item in ConflictsListView.Items)
             {
                 if (item is ConflictItem conflictItem && conflictItem.FilePath == filePath)
                 {
-                    // Select these items
                     ConflictsListView.SelectedItems.Add(item);
                 }
             }
         }
 
-        // Call from constructor to set up the conflict system
         private void InitializeConflictSystem()
         {
-            // Add context menu for conflicts
             AddConflictsContextMenu();
-
-            // Add double-click handler to jump to the mod
             ConflictsListView.MouseDoubleClick += (s, e) =>
             {
                 var originalSource = e.OriginalSource as DependencyObject;
@@ -2365,7 +1612,6 @@ namespace AMO_Launcher
 
         private void DeleteModItem(ModInfo mod)
         {
-            // Confirm deletion
             var result = MessageBox.Show(
                 $"Are you sure you want to delete '{mod.Name}' from your system?\n\nThis action cannot be undone.",
                 "Confirm Mod Deletion",
@@ -2373,30 +1619,23 @@ namespace AMO_Launcher
                 MessageBoxImage.Warning);
 
             if (result != MessageBoxResult.Yes) return;
-
-            // Delete the mod
             Mouse.OverrideCursor = Cursors.Wait;
 
             try
             {
-                // First remove from applied mods if it's there
                 if (mod.IsApplied)
                 {
                     mod.IsApplied = false;
                     _appliedMods.Remove(mod);
 
-                    // Update priorities
                     UpdateModPriorities();
                     UpdateModPriorityDisplays();
                 }
 
-                // Remove from flat list
                 _availableModsFlat.Remove(mod);
 
-                // Delete the actual mod files
                 if (mod.IsFromArchive)
                 {
-                    // Delete the archive file
                     if (!string.IsNullOrEmpty(mod.ArchiveSource) && File.Exists(mod.ArchiveSource))
                     {
                         File.Delete(mod.ArchiveSource);
@@ -2404,18 +1643,15 @@ namespace AMO_Launcher
                 }
                 else
                 {
-                    // Delete the mod folder
                     if (!string.IsNullOrEmpty(mod.ModFolderPath) && Directory.Exists(mod.ModFolderPath))
                     {
                         Directory.Delete(mod.ModFolderPath, true);
                     }
                 }
 
-                // Rebuild the category list
                 _availableModsCategories = _availableModsFlat.GroupByCategory();
                 AvailableModsTreeView.ItemsSource = _availableModsCategories;
 
-                // Mark that changes need to be applied
                 _configService.MarkModsChanged();
                 SaveAppliedMods();
             }
@@ -2436,20 +1672,15 @@ namespace AMO_Launcher
             {
                 App.LogToFile("Initializing profiles");
 
-                // Clear existing profiles collection
                 _profiles.Clear();
 
-                // Get profiles for the current game
                 if (_currentGame != null)
                 {
-                    // Get normalized game ID
                     string normalizedGameId = GetNormalizedCurrentGameId();
                     App.LogToFile($"Getting profiles for normalized game ID: {normalizedGameId}");
 
-                    // Get profiles for this game
                     var gameProfiles = _profileService.GetProfilesForGame(normalizedGameId);
 
-                    // Add them to the collection
                     if (gameProfiles != null && gameProfiles.Count > 0)
                     {
                         foreach (var profile in gameProfiles)
@@ -2464,15 +1695,12 @@ namespace AMO_Launcher
                     else
                     {
                         App.LogToFile("No profiles found, creating default profile");
-                        // No profiles found, create a default one
                         var defaultProfile = new ModProfile();
                         _profiles.Add(defaultProfile);
 
-                        // Save this new profile
                         _profileService.ImportProfileDirectAsync(normalizedGameId, defaultProfile).ConfigureAwait(false);
                     }
 
-                    // Use the new method to get fully loaded active profile
                     _activeProfile = _profileService.GetFullyLoadedActiveProfile(normalizedGameId);
 
                     App.LogToFile($"Got active profile: {_activeProfile.Name} (ID: {_activeProfile.Id})");
@@ -2480,13 +1708,11 @@ namespace AMO_Launcher
                 }
                 else
                 {
-                    // If no game is selected, just add a default profile
                     _profiles.Add(new ModProfile { Name = "Default Profile" });
                     _activeProfile = _profiles[0];
                     App.LogToFile("No game selected, using default profile");
                 }
 
-                // Update the ComboBox in a UI-safe way
                 Dispatcher.Invoke(() => {
                     UpdateProfileComboBox();
                 });
@@ -2498,7 +1724,6 @@ namespace AMO_Launcher
                 App.LogToFile($"Error initializing profiles: {ex.Message}");
                 App.LogToFile($"Stack trace: {ex.StackTrace}");
 
-                // Fallback to a simple default setup
                 try
                 {
                     _profiles.Clear();
@@ -2511,13 +1736,11 @@ namespace AMO_Launcher
                 }
                 catch
                 {
-                    // Last resort - ignore all errors
                     App.LogToFile("Failed to create fallback profile");
                 }
             }
         }
 
-        // Update the ProfileComboBox_SelectionChanged handler
         private async void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
@@ -2529,13 +1752,11 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Get the selected profile
                 int selectedIndex = ProfileComboBox.SelectedIndex;
                 if (selectedIndex >= 0 && selectedIndex < _profiles.Count)
                 {
                     ModProfile selectedProfile = _profiles[selectedIndex];
 
-                    // If it's already the active profile, do nothing
                     if (_activeProfile != null && selectedProfile.Id == _activeProfile.Id)
                     {
                         App.LogToFile($"Already on profile: {selectedProfile.Name}, no change needed");
@@ -2546,10 +1767,8 @@ namespace AMO_Launcher
 
                     try
                     {
-                        // Show wait cursor
                         Mouse.OverrideCursor = Cursors.Wait;
 
-                        // Save current mods to the old active profile
                         if (_activeProfile != null)
                         {
                             App.LogToFile($"Saving current profile '{_activeProfile.Name}' before switching");
@@ -2559,16 +1778,12 @@ namespace AMO_Launcher
 
                         App.LogToFile($"Setting new active profile: {selectedProfile.Name}");
 
-                        // Update the active profile in memory
                         _activeProfile = selectedProfile;
 
-                        // Use normalized game ID
                         string normalizedGameId = GetNormalizedCurrentGameId();
 
-                        // Tell the service this is now the active profile with normalized game ID
                         await _profileService.SetActiveProfileAsync(normalizedGameId, _activeProfile.Id);
 
-                        // Load mods from this profile
                         LoadAppliedModsFromProfile(_activeProfile);
 
                         App.LogToFile("Profile switch complete");
@@ -2582,14 +1797,12 @@ namespace AMO_Launcher
                     }
                     finally
                     {
-                        // Clear wait cursor
                         Mouse.OverrideCursor = null;
                     }
                 }
             }
             catch (Exception ex)
             {
-                // Clear wait cursor
                 Mouse.OverrideCursor = null;
 
                 App.LogToFile($"Error in profile selection changed: {ex.Message}");
@@ -2599,7 +1812,6 @@ namespace AMO_Launcher
 
         private string ShowInputDialog(string title, string message, string defaultValue = "")
         {
-            // Create a simple input dialog
             Window dialog = new Window
             {
                 Title = title,
@@ -2611,10 +1823,8 @@ namespace AMO_Launcher
                 Background = (SolidColorBrush)Application.Current.Resources["SecondaryBrush"]
             };
 
-            // Create layout
             StackPanel panel = new StackPanel { Margin = new Thickness(10) };
 
-            // Add message
             panel.Children.Add(new TextBlock
             {
                 Text = message,
@@ -2622,7 +1832,6 @@ namespace AMO_Launcher
                 Foreground = (SolidColorBrush)Application.Current.Resources["TextBrush"]
             });
 
-            // Add textbox
             TextBox textBox = new TextBox
             {
                 Text = defaultValue,
@@ -2634,16 +1843,14 @@ namespace AMO_Launcher
             };
             panel.Children.Add(textBox);
 
-            // Add buttons
             StackPanel buttonPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right
             };
 
-            // Create consistent button style
-            var buttonHeight = 32; // Set a consistent height for both buttons
-            var buttonPadding = new Thickness(8, 4, 8, 4); // Consistent padding for both buttons
+            var buttonHeight = 32;
+            var buttonPadding = new Thickness(8, 4, 8, 4);
 
             Button cancelButton = new Button
             {
@@ -2661,7 +1868,7 @@ namespace AMO_Launcher
             Button okButton = new Button
             {
                 Content = "OK",
-                Width = 80, // Keep same width as cancel button
+                Width = 80,
                 Height = buttonHeight,
                 Padding = buttonPadding,
                 Style = (Style)Application.Current.Resources["PrimaryButton"],
@@ -2672,12 +1879,10 @@ namespace AMO_Launcher
             };
             okButton.Click += (s, e) => { dialog.DialogResult = true; };
 
-            // Add buttons in the correct order
             buttonPanel.Children.Add(cancelButton);
             buttonPanel.Children.Add(okButton);
             panel.Children.Add(buttonPanel);
 
-            // Set content and focus textbox
             dialog.Content = panel;
             dialog.Loaded += (s, e) =>
             {
@@ -2685,42 +1890,35 @@ namespace AMO_Launcher
                 textBox.SelectAll();
             };
 
-            // Show dialog and return result
             bool? result = dialog.ShowDialog();
             return result == true ? textBox.Text : null;
         }
 
-        // Add the wire-up to InitializeUiAsync
         private void InitializeUi()
         {
             try
             {
                 App.LogToFile("Initializing profile UI components");
 
-                // Wire up profile combobox selection changed event
                 ProfileComboBox.SelectionChanged += ProfileComboBox_SelectionChanged;
-                // Wire up the New Profile button
                 if (NewProfileButton != null)
                 {
                     NewProfileButton.Click += NewProfileButton_Click;
                     App.LogToFile("New Profile button wired up");
                 }
 
-                // Wire up the Delete Profile button
                 if (DeleteProfileButton != null)
                 {
                     DeleteProfileButton.Click += DeleteProfileButton_Click;
                     App.LogToFile("Delete Profile button wired up");
                 }
 
-                // Wire up the Export Profile button
                 if (ExportProfileButton != null)
                 {
                     ExportProfileButton.Click += ExportProfileButton_Click;
                     App.LogToFile("Export Profile button wired up");
                 }
 
-                // Wire up the Import Profile button
                 if (ImportProfileButton != null)
                 {
                     ImportProfileButton.Click += ImportProfileButton_Click;
@@ -2748,7 +1946,6 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Show input dialog to get profile name
                 string profileName = ShowInputDialog("New Profile", "Enter profile name:", "New Profile");
 
                 if (string.IsNullOrEmpty(profileName))
@@ -2759,66 +1956,50 @@ namespace AMO_Launcher
 
                 App.LogToFile($"Creating new profile: {profileName}");
 
-                // Show wait cursor
                 Mouse.OverrideCursor = Cursors.Wait;
 
                 try
                 {
-                    // IMPORTANT: Save current mods to active profile BEFORE creating a new one
                     if (_activeProfile != null)
                     {
                         App.LogToFile($"Saving current active profile '{_activeProfile?.Name}' before creating new one");
                         await SaveCurrentModsToActiveProfile();
                     }
 
-                    // Get normalized game ID
                     string normalizedGameId = GetNormalizedCurrentGameId();
                     App.LogToFile($"Using normalized game ID: {normalizedGameId}");
 
-                    // Create the profile using normalized game ID
                     var newProfile = await _profileService.CreateProfileAsync(normalizedGameId, profileName);
 
                     if (newProfile != null)
                     {
                         App.LogToFile($"New profile created: {newProfile.Name} with ID {newProfile.Id}");
 
-                        // Save profiles to persistent storage
                         await _profileService.SaveProfilesAsync();
-                        App.LogToFile("Profiles saved to storage");
 
-                        // Store the current active profile ID before we change it
                         string oldActiveProfileId = _activeProfile?.Id;
 
-                        // Set this as the active profile
                         _activeProfile = newProfile;
                         await _profileService.SetActiveProfileAsync(normalizedGameId, _activeProfile.Id);
 
-                        // Refresh the UI profiles list
                         InitializeProfiles();
 
-                        // Find the new profile index
                         int newProfileIndex = _profiles.FindIndex(p => p.Id == newProfile.Id);
 
-                        // Temporarily remove the selection changed event handler
                         ProfileComboBox.SelectionChanged -= ProfileComboBox_SelectionChanged;
 
-                        // Select the new profile in the dropdown without triggering event
                         if (newProfileIndex >= 0 && newProfileIndex < ProfileComboBox.Items.Count)
                         {
                             ProfileComboBox.SelectedIndex = newProfileIndex;
                         }
 
-                        // Restore the event handler
                         ProfileComboBox.SelectionChanged += ProfileComboBox_SelectionChanged;
 
-                        // Clear applied mods list (new profile starts empty)
                         _appliedMods.Clear();
                         AppliedModsListView.Visibility = Visibility.Collapsed;
 
-                        // Force UI refresh
                         AppliedModsListView.Items.Refresh();
 
-                        // Show success message
                         MessageBox.Show($"Profile '{newProfile.Name}' created successfully.", "Profile Created",
                             MessageBoxButton.OK, MessageBoxImage.Information);
                     }
@@ -2831,13 +2012,11 @@ namespace AMO_Launcher
                 }
                 finally
                 {
-                    // Restore cursor
                     Mouse.OverrideCursor = null;
                 }
             }
             catch (Exception ex)
             {
-                // Restore cursor in case of error
                 Mouse.OverrideCursor = null;
 
                 App.LogToFile($"Error creating profile: {ex.Message}");
@@ -2866,7 +2045,6 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Get the selected profile
                 int selectedIndex = ProfileComboBox.SelectedIndex;
                 if (selectedIndex < 0 || selectedIndex >= _profiles.Count)
                 {
@@ -2877,7 +2055,6 @@ namespace AMO_Launcher
                 ModProfile selectedProfile = _profiles[selectedIndex];
                 App.LogToFile($"Selected profile for deletion: {selectedProfile.Name} (ID: {selectedProfile.Id})");
 
-                // Confirm deletion
                 var result = MessageBox.Show($"Are you sure you want to delete the profile '{selectedProfile.Name}'?\n\nThis action cannot be undone.",
                     "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
@@ -2887,21 +2064,18 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Show wait cursor
                 Mouse.OverrideCursor = Cursors.Wait;
 
                 try
                 {
                     App.LogToFile($"Deleting profile {selectedProfile.Name} with ID {selectedProfile.Id}");
 
-                    // More detailed logging of which profiles exist
                     App.LogToFile($"Current profiles in memory:");
                     foreach (var profile in _profiles)
                     {
                         App.LogToFile($"  - {profile.Name} (ID: {profile.Id})");
                     }
 
-                    // Delete the profile
                     bool deleted = await _profileService.DeleteProfileAsync(_currentGame.Id, selectedProfile.Id);
                     App.LogToFile($"DeleteProfileAsync returned: {deleted}");
 
@@ -2909,20 +2083,16 @@ namespace AMO_Launcher
                     {
                         App.LogToFile($"Profile deleted: {selectedProfile.Name}");
 
-                        // Force save to ensure the change is persisted
                         await _profileService.SaveProfilesAsync();
                         App.LogToFile("Profiles saved after deletion");
 
-                        // Refresh the profiles list
                         InitializeProfiles();
 
-                        // Reload mods for the new active profile
                         if (_activeProfile != null)
                         {
                             LoadAppliedModsFromProfile(_activeProfile);
                         }
 
-                        // Show success message
                         MessageBox.Show($"Profile '{selectedProfile.Name}' deleted successfully.", "Profile Deleted",
                             MessageBoxButton.OK, MessageBoxImage.Information);
                     }
@@ -2942,13 +2112,12 @@ namespace AMO_Launcher
                 }
                 finally
                 {
-                    // Restore cursor
                     Mouse.OverrideCursor = null;
                 }
             }
             catch (Exception ex)
             {
-                // Restore cursor in case of error
+
                 Mouse.OverrideCursor = null;
 
                 App.LogToFile($"Error in DeleteProfileButton_Click: {ex.Message}");
@@ -2971,7 +2140,6 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Get the selected profile
                 int selectedIndex = ProfileComboBox.SelectedIndex;
                 if (selectedIndex < 0 || selectedIndex >= _profiles.Count)
                 {
@@ -2984,7 +2152,6 @@ namespace AMO_Launcher
                 ModProfile selectedProfile = _profiles[selectedIndex];
                 App.LogToFile($"Selected profile for export: {selectedProfile.Name} (ID: {selectedProfile.Id})");
 
-                // First save any pending changes to the profile
                 try
                 {
                     var currentMods = _appliedMods.Select(m => new AppliedModSetting
@@ -3002,10 +2169,8 @@ namespace AMO_Launcher
                 catch (Exception ex)
                 {
                     App.LogToFile($"Error saving current profile before export: {ex.Message}");
-                    // Continue anyway
                 }
 
-                // Create a SaveFileDialog
                 var saveFileDialog = new Microsoft.Win32.SaveFileDialog
                 {
                     Title = "Export Profile",
@@ -3019,18 +2184,14 @@ namespace AMO_Launcher
                 {
                     App.LogToFile($"Selected export file: {saveFileDialog.FileName}");
 
-                    // Show wait cursor
                     Mouse.OverrideCursor = Cursors.Wait;
 
                     try
                     {
-                        // Create a clean copy of the profile with all paths converted to relative
                         var exportProfile = CreateExportCopy(selectedProfile);
 
-                        // Export the profile to the selected path
                         App.LogToFile($"Exporting profile {selectedProfile.Name} to {saveFileDialog.FileName}");
 
-                        // Export using System.Text.Json
                         string json = System.Text.Json.JsonSerializer.Serialize(exportProfile, new System.Text.Json.JsonSerializerOptions
                         {
                             WriteIndented = true
@@ -3039,7 +2200,6 @@ namespace AMO_Launcher
                         File.WriteAllText(saveFileDialog.FileName, json);
                         App.LogToFile($"Profile JSON written to file successfully");
 
-                        // Restore cursor
                         Mouse.OverrideCursor = null;
 
                         App.LogToFile($"Profile exported to: {saveFileDialog.FileName}");
@@ -3048,7 +2208,6 @@ namespace AMO_Launcher
                     }
                     catch (Exception ex)
                     {
-                        // Restore cursor in case of error
                         Mouse.OverrideCursor = null;
 
                         App.LogToFile($"Error exporting profile: {ex.Message}");
@@ -3064,7 +2223,6 @@ namespace AMO_Launcher
             }
             catch (Exception ex)
             {
-                // Restore cursor in case of error
                 Mouse.OverrideCursor = null;
 
                 App.LogToFile($"Error in ExportProfileButton_Click: {ex.Message}");
@@ -3087,7 +2245,6 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Create an OpenFileDialog
                 var openFileDialog = new Microsoft.Win32.OpenFileDialog
                 {
                     Title = "Import Profile",
@@ -3100,18 +2257,14 @@ namespace AMO_Launcher
                 {
                     App.LogToFile($"Selected import file: {openFileDialog.FileName}");
 
-                    // Show wait cursor
                     Mouse.OverrideCursor = Cursors.Wait;
 
                     try
                     {
-                        // Import the profile
                         App.LogToFile($"Reading file content from {openFileDialog.FileName}");
 
-                        // Read the file content directly
                         string json = File.ReadAllText(openFileDialog.FileName);
 
-                        // Manually deserialize to avoid ProfileService issues
                         var importedProfile = System.Text.Json.JsonSerializer.Deserialize<ModProfile>(json);
 
                         if (importedProfile == null)
@@ -3119,7 +2272,6 @@ namespace AMO_Launcher
                             throw new Exception("Failed to deserialize profile data");
                         }
 
-                        // Generate a new ID to avoid conflicts
                         string oldId = importedProfile.Id;
                         importedProfile.Id = Guid.NewGuid().ToString();
                         importedProfile.LastModified = DateTime.Now;
@@ -3127,7 +2279,6 @@ namespace AMO_Launcher
                         App.LogToFile($"Imported profile: {importedProfile.Name} with {importedProfile.AppliedMods?.Count ?? 0} mods");
                         App.LogToFile($"Changed ID from {oldId} to {importedProfile.Id}");
 
-                        // Ensure the name is unique
                         string baseName = importedProfile.Name;
                         int counter = 1;
 
@@ -3136,13 +2287,11 @@ namespace AMO_Launcher
                             importedProfile.Name = $"{baseName} (Imported {counter++})";
                         }
 
-                        // Make sure applied mods list is initialized
                         if (importedProfile.AppliedMods == null)
                         {
                             importedProfile.AppliedMods = new List<AppliedModSetting>();
                         }
 
-                        // Add to the ProfileService using its proper methods
                         var imported = await _profileService.ImportProfileDirectAsync(_currentGame.Id, importedProfile);
 
                         if (imported == null)
@@ -3150,24 +2299,19 @@ namespace AMO_Launcher
                             throw new Exception("Failed to import profile to service");
                         }
 
-                        // Set as active profile
                         await _profileService.SetActiveProfileAsync(_currentGame.Id, imported.Id);
 
                         App.LogToFile($"Added and set as active profile: {imported.Name}");
 
-                        // Save changes to persistent storage
                         await _profileService.SaveProfilesAsync();
                         App.LogToFile("Profiles saved to storage after import");
 
-                        // Refresh UI
                         InitializeProfiles();
                         LoadProfilesIntoDropdown();
 
-                        // Load the imported profile's mods
                         _activeProfile = imported;
                         LoadAppliedModsFromProfile(_activeProfile);
 
-                        // Restore cursor
                         Mouse.OverrideCursor = null;
 
                         App.LogToFile($"Profile imported successfully");
@@ -3176,7 +2320,6 @@ namespace AMO_Launcher
                     }
                     catch (Exception ex)
                     {
-                        // Restore cursor in case of error
                         Mouse.OverrideCursor = null;
 
                         App.LogToFile($"Error importing profile: {ex.Message}");
@@ -3192,7 +2335,6 @@ namespace AMO_Launcher
             }
             catch (Exception ex)
             {
-                // Restore cursor in case of error
                 Mouse.OverrideCursor = null;
 
                 App.LogToFile($"Error in ImportProfileButton_Click: {ex.Message}");
@@ -3208,7 +2350,6 @@ namespace AMO_Launcher
             {
                 App.LogToFile($"Loading mods from profile: {profile.Name} (ID: {profile.Id})");
 
-                // Clear current applied mods
                 _appliedMods.Clear();
 
                 if (profile == null)
@@ -3218,7 +2359,6 @@ namespace AMO_Launcher
                     return;
                 }
 
-                // Initialize AppliedMods if null to prevent exceptions
                 if (profile.AppliedMods == null)
                 {
                     profile.AppliedMods = new List<AppliedModSetting>();
@@ -3234,17 +2374,14 @@ namespace AMO_Launcher
 
                 App.LogToFile($"Profile contains {profile.AppliedMods.Count} mods");
 
-                // Detailed logging of mods in profile
                 foreach (var mod in profile.AppliedMods)
                 {
                     App.LogToFile($"  Profile mod: {(mod.IsFromArchive ? mod.ArchiveSource : mod.ModFolderPath)}, Active: {mod.IsActive}");
                 }
 
-                // Create a lookup dictionary of all available mods for faster searching
                 Dictionary<string, ModInfo> availableMods = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
                 foreach (var mod in _availableModsFlat)
                 {
-                    // Use both possible keys to find the mod - by archive path or folder path
                     if (mod.IsFromArchive && !string.IsNullOrEmpty(mod.ArchiveSource))
                     {
                         string key = PathUtility.ToAbsolutePath(mod.ArchiveSource);
@@ -3264,7 +2401,6 @@ namespace AMO_Launcher
                     }
                 }
 
-                // For each saved mod in the profile, find the corresponding mod
                 foreach (var setting in profile.AppliedMods)
                 {
                     try
@@ -3275,7 +2411,6 @@ namespace AMO_Launcher
                             continue;
                         }
 
-                        // Convert relative paths to absolute for search
                         string searchPath = setting.IsFromArchive
                             ? PathUtility.ToAbsolutePath(setting.ArchiveSource)
                             : PathUtility.ToAbsolutePath(setting.ModFolderPath);
@@ -3288,10 +2423,8 @@ namespace AMO_Launcher
 
                         App.LogToFile($"Looking for mod: {searchPath}");
 
-                        // First try dictionary lookup (much faster)
                         if (availableMods.TryGetValue(searchPath, out var mod))
                         {
-                            // Set properties and add to applied mods
                             mod.IsApplied = true;
                             mod.IsActive = setting.IsActive;
                             _appliedMods.Add(mod);
@@ -3299,12 +2432,10 @@ namespace AMO_Launcher
                             continue;
                         }
 
-                        // Fall back to directory/file checking if not found in dictionary
                         if (setting.IsFromArchive && !string.IsNullOrEmpty(setting.ArchiveSource))
                         {
                             App.LogToFile($"Mod not found in available mods, trying to load archive directly");
 
-                            // Try to load from archive directly
                             try
                             {
                                 string absoluteArchivePath = PathUtility.ToAbsolutePath(setting.ArchiveSource);
@@ -3315,7 +2446,7 @@ namespace AMO_Launcher
                                     var archiveTask = _modDetectionService.LoadModFromArchivePathAsync(
                                         absoluteArchivePath, _currentGame.Name, setting.ArchiveRootPath);
 
-                                    if (archiveTask.Wait(3000))  // 3 second timeout
+                                    if (archiveTask.Wait(3000))
                                     {
                                         var archiveMod = archiveTask.Result;
                                         if (archiveMod != null)
@@ -3349,7 +2480,6 @@ namespace AMO_Launcher
                         {
                             App.LogToFile($"Mod not found in available mods, trying to load from folder directly");
 
-                            // Try to load from folder directly
                             try
                             {
                                 string absoluteFolderPath = PathUtility.ToAbsolutePath(setting.ModFolderPath);
@@ -3388,19 +2518,15 @@ namespace AMO_Launcher
                     catch (Exception ex)
                     {
                         App.LogToFile($"Error adding mod from profile: {ex.Message}");
-                        // Continue with next mod
                     }
                 }
 
-                // Show or hide ListView based on whether we have applied mods
                 Dispatcher.Invoke(() => {
                     AppliedModsListView.Visibility = _appliedMods.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-                    // Explicitly refresh the ListView
                     AppliedModsListView.Items.Refresh();
                 });
 
-                // Update mod priorities and conflicts
                 UpdateModPriorities();
                 UpdateModPriorityDisplays();
                 DetectModConflicts();
@@ -3418,10 +2544,8 @@ namespace AMO_Launcher
             UpdateProfileComboBox();
         }
 
-        // Helper method to create a clean export copy with all relative paths
         private ModProfile CreateExportCopy(ModProfile original)
         {
-            // Create a fresh profile object
             var copy = new ModProfile
             {
                 Id = original.Id,
@@ -3429,12 +2553,10 @@ namespace AMO_Launcher
                 LastModified = original.LastModified
             };
 
-            // Create a fresh list of mod settings with all paths correctly relative
             if (original.AppliedMods != null)
             {
                 copy.AppliedMods = original.AppliedMods.Select(m => new AppliedModSetting
                 {
-                    // Ensure all paths are relative
                     ModFolderPath = m.IsFromArchive ? null : EnsureRelativePath(m.ModFolderPath),
                     IsActive = m.IsActive,
                     IsFromArchive = m.IsFromArchive,
@@ -3452,17 +2574,14 @@ namespace AMO_Launcher
             return copy;
         }
 
-        // Helper to ensure a path is in relative format
         private string EnsureRelativePath(string path)
         {
             if (string.IsNullOrEmpty(path))
                 return path;
 
-            // If already relative, return as is
             if (!Path.IsPathRooted(path))
                 return path;
 
-            // Convert to relative path
             return PathUtility.ToRelativePath(path);
         }
 
@@ -3470,10 +2589,8 @@ namespace AMO_Launcher
         {
             try
             {
-                // Clear the ComboBox
                 ProfileComboBox.Items.Clear();
 
-                // Add each profile name
                 foreach (var profile in _profiles)
                 {
                     if (profile != null)
@@ -3482,12 +2599,10 @@ namespace AMO_Launcher
                     }
                 }
 
-                // Select the active profile
                 if (_activeProfile != null)
                 {
                     int indexToSelect = -1;
 
-                    // Find the index of the active profile
                     for (int i = 0; i < _profiles.Count; i++)
                     {
                         if (_profiles[i] != null && _profiles[i].Id == _activeProfile.Id)
@@ -3497,7 +2612,6 @@ namespace AMO_Launcher
                         }
                     }
 
-                    // Set the selection
                     if (indexToSelect >= 0 && indexToSelect < ProfileComboBox.Items.Count)
                     {
                         ProfileComboBox.SelectedIndex = indexToSelect;
@@ -3505,7 +2619,6 @@ namespace AMO_Launcher
                     }
                     else if (ProfileComboBox.Items.Count > 0)
                     {
-                        // Default to first item
                         ProfileComboBox.SelectedIndex = 0;
                         App.LogToFile($"Active profile not found in list, selected first profile");
                     }
@@ -3524,12 +2637,10 @@ namespace AMO_Launcher
             }
         }
 
-        // Helper method to save current mods to active profile
         private async Task SaveCurrentModsToActiveProfile()
         {
             try
             {
-                // Skip if no active profile or game
                 if (_activeProfile == null || _currentGame == null)
                 {
                     App.LogToFile("Cannot save mods - no active profile or game");
@@ -3538,7 +2649,6 @@ namespace AMO_Launcher
 
                 App.LogToFile($"SaveCurrentModsToActiveProfile: Saving mods to '{_activeProfile.Name}' (ID: {_activeProfile.Id})");
 
-                // Collect current mods with relative paths
                 var currentMods = _appliedMods.Select(m => new AppliedModSetting
                 {
                     ModFolderPath = m.IsFromArchive ? null : PathUtility.ToRelativePath(m.ModFolderPath),
@@ -3548,22 +2658,18 @@ namespace AMO_Launcher
                     ArchiveRootPath = m.ArchiveRootPath
                 }).ToList();
 
-                // Log what we're saving
                 App.LogToFile($"Saving {currentMods.Count} mods to active profile");
                 foreach (var mod in currentMods)
                 {
                     App.LogToFile($"  - Mod: {(mod.IsFromArchive ? mod.ArchiveSource : mod.ModFolderPath)}, Active: {mod.IsActive}");
                 }
 
-                // Update the profile object in memory
                 _activeProfile.AppliedMods = new List<AppliedModSetting>(currentMods);
                 _activeProfile.LastModified = DateTime.Now;
 
-                // Save to ProfileService using normalized gameId
                 string normalizedGameId = GetNormalizedCurrentGameId();
                 await _profileService.UpdateActiveProfileModsAsync(normalizedGameId, currentMods);
 
-                // Also save to config service for both normalized and non-normalized game IDs
                 await _configService.SaveAppliedModsAsync(normalizedGameId, currentMods);
                 if (normalizedGameId != _currentGame.Id)
                 {
@@ -3584,10 +2690,8 @@ namespace AMO_Launcher
             if (string.IsNullOrEmpty(gameId))
                 return gameId;
 
-            // Trim any whitespace
             gameId = gameId.Trim();
 
-            // Remove any suffix after underscore
             int underscoreIndex = gameId.IndexOf('_');
             if (underscoreIndex > 0)
             {
@@ -3597,7 +2701,6 @@ namespace AMO_Launcher
             return gameId;
         }
 
-        // Apply game ID normalization to the current game
         private string GetNormalizedCurrentGameId()
         {
             if (_currentGame == null)
