@@ -16,6 +16,7 @@ namespace AMO_Launcher
         public static GameBackupService GameBackupService { get; private set; } = null!;
         public static ProfileService ProfileService { get; private set; } = null!;
         public static UpdateService UpdateService { get; private set; } = null!;
+        public static LogService LogService { get; private set; }
 
         // Log file for debugging
         private static readonly string LogFilePath;
@@ -130,6 +131,9 @@ namespace AMO_Launcher
                 LogToFile("Initializing ConfigService");
                 // Initialize the configuration service first
                 ConfigService = new ConfigurationService();
+
+                LogService = new LogService();
+                LogService.Initialize(ConfigService);
 
                 LogToFile("Initializing IconCacheService");
                 // Initialize the icon cache service
@@ -273,15 +277,25 @@ namespace AMO_Launcher
         {
             try
             {
-                // Skip detailed logs if detailed logging is not enabled
-                if (isDetailedLog && ConfigService != null && !ConfigService.GetEnableDetailedLogging())
+                if (LogService == null)
                 {
+                    // Fall back to direct file logging if LogService is not initialized
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    string logMessage = $"[{timestamp}] {message}";
+                    File.AppendAllText(LogFilePath, logMessage + Environment.NewLine);
                     return;
                 }
 
-                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                string logMessage = $"[{timestamp}] {message}";
-                File.AppendAllText(LogFilePath, logMessage + Environment.NewLine);
+                if (isDetailedLog)
+                {
+                    // Detailed logs go to Debug level
+                    LogService.LogDebug(message);
+                }
+                else
+                {
+                    // Standard logs go to Info level
+                    LogService.Info(message);
+                }
             }
             catch
             {
@@ -292,7 +306,59 @@ namespace AMO_Launcher
         // Overload for detailed logging
         public static void LogDetailedToFile(string message)
         {
-            LogToFile(message, true);
+            if (LogService != null)
+            {
+                LogService.LogDebug(message);
+            }
+            else
+            {
+                LogToFile(message, true);
+            }
+        }
+
+        // Add these new helpers for different log levels
+        public static void LogError(string message, Exception ex = null)
+        {
+            if (LogService == null)
+            {
+                string fullMessage = ex != null
+                    ? $"ERROR: {message} - Exception: {ex.Message}"
+                    : $"ERROR: {message}";
+                LogToFile(fullMessage);
+                return;
+            }
+
+            LogService.Error(message);
+
+            // For errors, also log stack trace in detailed mode
+            if (ex != null)
+            {
+                LogService.LogDebug($"Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        public static void LogWarning(string message)
+        {
+            if (LogService != null)
+            {
+                LogService.Warning(message);
+            }
+            else
+            {
+                LogToFile($"WARNING: {message}");
+            }
+        }
+
+        public static void LogTrace(string message)
+        {
+            if (LogService != null)
+            {
+                LogService.Trace(message);
+            }
+            else
+            {
+                LogToFile(message, true);
+            }
         }
 
         // Handle unhandled exceptions to prevent crashes

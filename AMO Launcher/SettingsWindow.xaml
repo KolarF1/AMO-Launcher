@@ -638,7 +638,7 @@
                                 Style="{StaticResource ActionButton}"
                                 Click="DiscordButton_Click"
                                 Margin="0,0,5,0"
-                                Padding="8,5,8,5" Height="48.62">
+                                Padding="8,5,8,5" Height="40">
                             <Button.ContentTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
@@ -657,7 +657,7 @@
                                 Content="Help" 
                                 Style="{StaticResource ActionButton}"
                                 Click="HelpButton_Click"
-                                Padding="8,5,8,5" Height="48.62">
+                                Padding="8,5,8,5" Height="40">
                             <Button.ContentTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">

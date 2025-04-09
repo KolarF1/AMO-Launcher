@@ -113,6 +113,10 @@ namespace AMO_Launcher.Views
                 configService.SetAutoDetectGamesAtStartup(AutoDetectGamesCheckBox.IsChecked ?? true);
                 configService.SetAutoCheckForUpdatesAtStartup(AutoCheckUpdatesCheckBox.IsChecked ?? true);
                 configService.SetEnableDetailedLogging(DetailedLoggingCheckBox.IsChecked ?? false);
+                if (App.LogService != null)
+                {
+                    App.LogService.UpdateDetailedLogging(DetailedLoggingCheckBox.IsChecked ?? false);
+                }
                 configService.SetLowUsageMode(LowUsageModeCheckBox.IsChecked ?? false);
                 configService.SetRememberLastSelectedGame(RememberLastGameCheckBox.IsChecked ?? true);
 
