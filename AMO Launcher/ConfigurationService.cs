@@ -80,106 +80,138 @@ namespace AMO_Launcher.Services
                 if (File.Exists(_configFilePath))
                 {
                     App.LogService?.LogDebug($"Reading settings from: {_configFilePath}");
-                    string json = await File.ReadAllTextAsync(_configFilePath);
-
-                    var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
-                    App.LogService?.LogDebug("Settings deserialized successfully");
-
-                    // Ensure the RemovedGamePaths list exists
-                    if (loadedSettings.RemovedGamePaths == null)
+                    try
                     {
-                        App.LogService?.LogDebug("Initializing missing RemovedGamePaths collection");
-                        loadedSettings.RemovedGamePaths = new List<string>();
-                    }
+                        string json = await File.ReadAllTextAsync(_configFilePath);
 
-                    // Ensure the AppliedMods dictionary exists
-                    if (loadedSettings.AppliedMods == null)
-                    {
-                        App.LogService?.LogDebug("Initializing missing AppliedMods dictionary");
-                        loadedSettings.AppliedMods = new Dictionary<string, List<AppliedModSetting>>();
-                    }
+                        var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
+                        App.LogService?.LogDebug("Settings deserialized successfully");
 
-                    // Ensure the LastAppliedMods dictionary exists
-                    if (loadedSettings.LastAppliedMods == null)
-                    {
-                        App.LogService?.LogDebug("Initializing missing LastAppliedMods dictionary");
-                        loadedSettings.LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>();
-                    }
-
-                    // Ensure the GameProfiles dictionary exists and is case-insensitive
-                    if (loadedSettings.GameProfiles == null)
-                    {
-                        App.LogService?.LogDebug("Initializing missing GameProfiles dictionary");
-                        loadedSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
-                    }
-                    else if (!(loadedSettings.GameProfiles is Dictionary<string, List<ModProfile>>))
-                    {
-                        // Copy to a case-insensitive dictionary if it's not already one
-                        App.LogService?.LogDebug("Converting GameProfiles to case-insensitive dictionary");
-                        var newDict = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
-                        foreach (var entry in loadedSettings.GameProfiles)
+                        // Ensure the RemovedGamePaths list exists
+                        if (loadedSettings.RemovedGamePaths == null)
                         {
-                            newDict[entry.Key] = entry.Value;
+                            App.LogService?.LogDebug("Initializing missing RemovedGamePaths collection");
+                            loadedSettings.RemovedGamePaths = new List<string>();
                         }
-                        loadedSettings.GameProfiles = newDict;
-                    }
 
-                    // Ensure the ActiveProfileIds dictionary exists and is case-insensitive
-                    if (loadedSettings.ActiveProfileIds == null)
-                    {
-                        App.LogService?.LogDebug("Initializing missing ActiveProfileIds dictionary");
-                        loadedSettings.ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    }
-                    else if (!(loadedSettings.ActiveProfileIds is Dictionary<string, string>))
-                    {
-                        // Copy to a case-insensitive dictionary if it's not already one
-                        App.LogService?.LogDebug("Converting ActiveProfileIds to case-insensitive dictionary");
-                        var newDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                        foreach (var entry in loadedSettings.ActiveProfileIds)
+                        // Ensure the AppliedMods dictionary exists
+                        if (loadedSettings.AppliedMods == null)
                         {
-                            newDict[entry.Key] = entry.Value;
+                            App.LogService?.LogDebug("Initializing missing AppliedMods dictionary");
+                            loadedSettings.AppliedMods = new Dictionary<string, List<AppliedModSetting>>();
                         }
-                        loadedSettings.ActiveProfileIds = newDict;
-                    }
 
-                    _currentSettings = loadedSettings;
-                    App.LogService?.Info("Settings loaded successfully");
-
-                    // Load icons from disk for all games
-                    App.LogService?.LogDebug("Loading icons for manually added games");
-                    int iconCount = 0;
-                    int failedIcons = 0;
-
-                    foreach (var game in _currentSettings.Games)
-                    {
-                        if (game.IsManuallyAdded && !string.IsNullOrEmpty(game.ExecutablePath))
+                        // Ensure the LastAppliedMods dictionary exists
+                        if (loadedSettings.LastAppliedMods == null)
                         {
-                            string iconPath = GetIconFilePath(game.ExecutablePath);
-                            if (File.Exists(iconPath))
+                            App.LogService?.LogDebug("Initializing missing LastAppliedMods dictionary");
+                            loadedSettings.LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>();
+                        }
+
+                        // Ensure the GameProfiles dictionary exists and is case-insensitive
+                        if (loadedSettings.GameProfiles == null)
+                        {
+                            App.LogService?.LogDebug("Initializing missing GameProfiles dictionary");
+                            loadedSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
+                        }
+                        else if (!(loadedSettings.GameProfiles is Dictionary<string, List<ModProfile>>))
+                        {
+                            // Copy to a case-insensitive dictionary if it's not already one
+                            App.LogService?.LogDebug("Converting GameProfiles to case-insensitive dictionary");
+                            var newDict = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var entry in loadedSettings.GameProfiles)
                             {
-                                try
+                                newDict[entry.Key] = entry.Value;
+                            }
+                            loadedSettings.GameProfiles = newDict;
+                        }
+
+                        // Ensure the ActiveProfileIds dictionary exists and is case-insensitive
+                        if (loadedSettings.ActiveProfileIds == null)
+                        {
+                            App.LogService?.LogDebug("Initializing missing ActiveProfileIds dictionary");
+                            loadedSettings.ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        }
+                        else if (!(loadedSettings.ActiveProfileIds is Dictionary<string, string>))
+                        {
+                            // Copy to a case-insensitive dictionary if it's not already one
+                            App.LogService?.LogDebug("Converting ActiveProfileIds to case-insensitive dictionary");
+                            var newDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var entry in loadedSettings.ActiveProfileIds)
+                            {
+                                newDict[entry.Key] = entry.Value;
+                            }
+                            loadedSettings.ActiveProfileIds = newDict;
+                        }
+
+                        _currentSettings = loadedSettings;
+                        App.LogService?.Info("Settings loaded successfully");
+
+                        // Load icons from disk for all games
+                        App.LogService?.LogDebug("Loading icons for manually added games");
+                        int iconCount = 0;
+                        int failedIcons = 0;
+
+                        foreach (var game in _currentSettings.Games)
+                        {
+                            if (game.IsManuallyAdded && !string.IsNullOrEmpty(game.ExecutablePath))
+                            {
+                                string iconPath = GetIconFilePath(game.ExecutablePath);
+                                if (File.Exists(iconPath))
                                 {
-                                    LoadAndCacheIconFromDisk(game.ExecutablePath);
-                                    iconCount++;
-                                    App.LogService?.Trace($"Loaded icon for game: {game.Name} ({game.ExecutablePath})");
-                                }
-                                catch (Exception ex)
-                                {
-                                    failedIcons++;
-                                    App.LogService?.Warning($"Error loading icon for {game.ExecutablePath}: {ex.Message}");
-                                    App.LogService?.LogDebug($"Icon load error details: {ex}");
+                                    try
+                                    {
+                                        LoadAndCacheIconFromDisk(game.ExecutablePath);
+                                        iconCount++;
+                                        App.LogService?.Trace($"Loaded icon for game: {game.Name} ({game.ExecutablePath})");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        failedIcons++;
+                                        App.LogService?.Warning($"Error loading icon for {game.ExecutablePath}: {ex.Message}");
+                                        App.LogService?.LogDebug($"Icon load error details: {ex}");
+                                    }
                                 }
                             }
                         }
+
+                        App.LogService?.LogDebug($"Icon loading complete - loaded {iconCount} icons, {failedIcons} failed");
+
+                        return _currentSettings;
                     }
+                    catch (Exception ex)
+                    {
+                        App.LogService?.Error($"Error reading settings file: {ex.Message}");
+                        App.LogService?.LogDebug($"Will attempt to load from backup or create new settings file");
 
-                    App.LogService?.LogDebug($"Icon loading complete - loaded {iconCount} icons, {failedIcons} failed");
+                        // Try loading from backup first
+                        bool backupLoaded = false;
+                        try
+                        {
+                            var backupSettings = await TryLoadFromBackupAsync();
+                            if (backupSettings != null)
+                            {
+                                backupLoaded = true;
+                                return backupSettings;
+                            }
+                        }
+                        catch (Exception backupEx)
+                        {
+                            App.LogService?.Error($"Failed to load from backup: {backupEx.Message}");
+                        }
 
-                    return _currentSettings;
+                        // If backup load failed, create new settings file
+                        if (!backupLoaded)
+                        {
+                            App.LogService?.Info("Creating new settings file with defaults");
+                            await SaveSettingsAsync(); // Save current default settings
+                        }
+                    }
                 }
                 else
                 {
-                    App.LogService?.Info("Settings file not found, using default settings");
+                    App.LogService?.Info("Settings file not found, creating with default settings");
+                    await SaveSettingsAsync(); // Save current default settings to create the file
                 }
 
                 return _currentSettings;
@@ -1446,7 +1478,7 @@ namespace AMO_Launcher.Services
                     ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
                     AutoDetectGamesAtStartup = true,
                     AutoCheckForUpdatesAtStartup = true,
-                    EnableDetailedLogging = false,
+                    EnableDetailedLogging = true,
                     LowUsageMode = false,
                     RememberLastSelectedGame = false, // Changed default to match new requirement
                     LauncherActionOnGameLaunch = "Minimize",

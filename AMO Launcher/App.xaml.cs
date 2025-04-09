@@ -121,13 +121,8 @@ namespace AMO_Launcher
                     LogToFile($"[{startupContextId}] Services initialized successfully");
                 }, "Service initialization", showErrorToUser: true);
 
-                // Load settings with error handling
-                await ErrorHandler.ExecuteSafeAsync(async () =>
-                {
-                    LogToFile($"[{startupContextId}] Loading application settings");
-                    await ConfigService.LoadSettingsAsync();
-                    LogToFile($"[{startupContextId}] Settings loaded successfully");
-                }, "Loading settings", showErrorToUser: true);
+                // REMOVED: Loading settings here - now done in InitializeServicesAsync
+                // This avoids loading settings twice and ensures settings are loaded before any saving operations
 
                 // Apply low usage mode settings if enabled
                 ErrorHandler.ExecuteSafe(() =>
@@ -239,6 +234,13 @@ namespace AMO_Launcher
                 LogToFile($"[{servicesContextId}] Initializing ConfigService");
                 ConfigService = new ConfigurationService();
                 LogToFile($"[{servicesContextId}] ConfigService initialized in {sw.ElapsedMilliseconds}ms");
+
+                // IMPORTANT: Load settings from disk BEFORE initializing other services
+                // or performing any operations that might save settings
+                sw.Restart();
+                LogToFile($"[{servicesContextId}] Loading settings from disk");
+                await ConfigService.LoadSettingsAsync();
+                LogToFile($"[{servicesContextId}] Settings loaded in {sw.ElapsedMilliseconds}ms");
 
                 // Initialize LogService early for better logging
                 sw.Restart();
