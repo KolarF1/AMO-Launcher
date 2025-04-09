@@ -228,4 +228,23 @@ namespace AMO_Launcher.Services
             }
         }
     }
+
+    public static class LogServiceExtensions
+    {
+        // Extension method for ShouldLogTrace capability
+        public static bool ShouldLogTrace(this LogService logService)
+        {
+            // Always return true - the LogService.Trace method will handle filtering
+            // This is just to keep existing code functioning
+            return true;
+        }
+
+        // Extension method for ShouldLogDebug capability
+        public static bool ShouldLogDebug(this LogService logService)
+        {
+            // Always return true - the LogService.LogDebug method will handle filtering
+            // This is just to keep existing code functioning
+            return true;
+        }
+    }
 }
