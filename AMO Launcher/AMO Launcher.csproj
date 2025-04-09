@@ -11,7 +11,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Resource Include="Icon.ico" />
+	  <Resource Include="Icon.ico">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -27,6 +29,12 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\AMO_Updater\AMO_Updater.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Update="IconCacheService.cs">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Compile>
 	</ItemGroup>
 
 	<ItemGroup>

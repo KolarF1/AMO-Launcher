@@ -1,4 +1,5 @@
 ﻿using AMO_Launcher.Models;
+using AMO_Launcher.Utilities;
 using System;
 using System.Windows;
 using System.Windows.Input;
@@ -7,46 +8,93 @@ namespace AMO_Launcher.Views
 {
     public partial class GameVerificationDialog : Window
     {
+        // Make fields non-readonly to avoid initialization restrictions
+        // or initialize them directly at declaration
+        private GameInfo _game;
+        private bool _isVersionChange;
+
         public bool UserConfirmed { get; private set; } = false;
-        private readonly GameInfo _game;
-        private readonly bool _isVersionChange;
 
         public GameVerificationDialog(GameInfo game, bool isVersionChange = false)
         {
             InitializeComponent();
+
+            // Initialize fields after component initialization
             _game = game;
             _isVersionChange = isVersionChange;
 
-            // Set dialog content based on context
-            if (isVersionChange)
+            // Log initialization information
+            ErrorHandler.ExecuteSafe(() =>
             {
+                App.LogService?.Info($"Opening game verification dialog for game: {game?.Name ?? "unknown"}");
+                App.LogService?.LogDebug($"Dialog parameters - Game: {game?.Name}, IsVersionChange: {isVersionChange}");
+
+                // Set dialog content based on context
+                ConfigureDialogContent();
+            }, "Initializing game verification dialog", true);
+        }
+
+        // Extract configuration logic to a separate method
+        private void ConfigureDialogContent()
+        {
+            if (_isVersionChange)
+            {
+                App.LogService?.LogDebug("Configuring dialog for version change scenario");
                 TitleTextBlock.Text = "Game Version Changed";
-                MessageTextBlock.Text = $"The version of {game.Name} has changed. To ensure mods work correctly, the launcher needs to re-create the Original Game Data backup.\n\nPlease verify your game files through Steam/Epic/EA first, then click Continue.";
+                MessageTextBlock.Text = $"The version of {_game.Name} has changed. To ensure mods work correctly, the launcher needs to re-create the Original Game Data backup.\n\nPlease verify your game files through Steam/Epic/EA first, then click Continue.";
             }
             else
             {
+                App.LogService?.LogDebug("Configuring dialog for standard verification scenario");
                 TitleTextBlock.Text = "Game Verification Required";
-                MessageTextBlock.Text = $"Before you can use mods with {game.Name}, the launcher needs to create a backup of the original game files.\n\nPlease verify your game files through Steam/Epic/EA first, then click Continue.";
+                MessageTextBlock.Text = $"Before you can use mods with {_game.Name}, the launcher needs to create a backup of the original game files.\n\nPlease verify your game files through Steam/Epic/EA first, then click Continue.";
             }
 
-            GameNameTextBlock.Text = game.Name;
+            GameNameTextBlock.Text = _game?.Name ?? "Unknown Game";
 
             // Set the game icon if available
-            if (game.Icon != null)
+            if (_game?.Icon != null)
             {
-                GameIconImage.Source = game.Icon;
+                App.LogService?.LogDebug("Setting game icon in verification dialog");
+                GameIconImage.Source = _game.Icon;
             }
+            else
+            {
+                App.LogService?.LogDebug("No game icon available to display");
+            }
+
+            App.LogService?.LogDebug("Game verification dialog initialized successfully");
         }
 
-        // New method to customize the dialog for the Reset operation
+        // Method to customize the dialog for the Reset operation
         public void CustomizeForReset()
         {
-            TitleTextBlock.Text = "Reset Original Game Data";
-            MessageTextBlock.Text = $"You are about to reset the Original Game Data backup for {_game.Name}.\n\nBefore continuing, please verify your game files through Steam/Epic/EA to ensure you have clean, unmodified files.\n\nClick Continue when you're ready to proceed with the reset.";
+            ErrorHandler.ExecuteSafe(() =>
+            {
+                App.LogService?.Info($"Customizing verification dialog for reset operation: {_game?.Name}");
+
+                if (_game == null)
+                {
+                    App.LogService?.Warning("CustomizeForReset called with null game reference");
+                    return;
+                }
+
+                TitleTextBlock.Text = "Reset Original Game Data";
+                MessageTextBlock.Text = $"You are about to reset the Original Game Data backup for {_game.Name}.\n\nBefore continuing, please verify your game files through Steam/Epic/EA to ensure you have clean, unmodified files.\n\nClick Continue when you're ready to proceed with the reset.";
+
+                App.LogService?.LogDebug("Dialog customized for reset operation");
+            }, "Customizing dialog for reset operation", true);
         }
 
         // Command for dragging the window
-        public ICommand DragMoveCommand => new RelayCommand(() => DragMove());
+        public ICommand DragMoveCommand => new RelayCommand(() =>
+        {
+            ErrorHandler.ExecuteSafe(() =>
+            {
+                App.LogService?.Trace("Executing DragMove command");
+                DragMove();
+            }, "Dragging verification dialog window", false);
+        });
 
         // Relay command implementation
         public class RelayCommand : ICommand
@@ -60,7 +108,13 @@ namespace AMO_Launcher.Views
 
             public bool CanExecute(object parameter) => true;
 
-            public void Execute(object parameter) => _execute();
+            public void Execute(object parameter)
+            {
+                ErrorHandler.ExecuteSafe(() =>
+                {
+                    _execute();
+                }, "Executing relay command", false);
+            }
 
             public event EventHandler CanExecuteChanged
             {
@@ -72,15 +126,25 @@ namespace AMO_Launcher.Views
         // Command for canceling/closing
         public ICommand CancelCommand => new RelayCommand(() =>
         {
-            UserConfirmed = false;
-            Close();
+            ErrorHandler.ExecuteSafe(() =>
+            {
+                App.LogService?.Info($"User canceled game verification for {_game?.Name}");
+                UserConfirmed = false;
+                App.LogService?.LogDebug("Setting UserConfirmed = false and closing dialog");
+                Close();
+            }, "Handling verification dialog cancel", true);
         });
 
         // Command for continuing
         public ICommand ContinueCommand => new RelayCommand(() =>
         {
-            UserConfirmed = true;
-            Close();
+            ErrorHandler.ExecuteSafe(() =>
+            {
+                App.LogService?.Info($"User confirmed game verification for {_game?.Name}");
+                UserConfirmed = true;
+                App.LogService?.LogDebug("Setting UserConfirmed = true and closing dialog");
+                Close();
+            }, "Handling verification dialog continue", true);
         });
     }
 }

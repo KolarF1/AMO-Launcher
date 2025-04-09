@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace AMO_Launcher.Services
 {
@@ -33,214 +34,230 @@ namespace AMO_Launcher.Services
         // Get profiles for a game
         public List<ModProfile> GetProfilesForGame(string gameId)
         {
-            // Always normalize the game ID first
-            gameId = NormalizeGameId(gameId);
-
-            if (string.IsNullOrEmpty(gameId))
+            return ErrorHandler.ExecuteSafe(() =>
             {
-                App.LogToFile("GetProfilesForGame: gameId is null or empty, returning empty list");
-                return new List<ModProfile>();
-            }
+                // Always normalize the game ID first
+                gameId = NormalizeGameId(gameId);
 
-            // Log the normalized game ID we're using
-            App.LogToFile($"GetProfilesForGame: Looking for profiles for normalized game ID '{gameId}'");
-
-            // First check if we already have profiles in memory
-            if (_gameProfiles.ContainsKey(gameId))
-            {
-                var profiles = _gameProfiles[gameId];
-                App.LogToFile($"Found {profiles.Count} profiles in memory for game '{gameId}'");
-                return profiles;
-            }
-
-            // If not in memory, check storage before creating default
-            try
-            {
-                // Create a synchronous wrapper around the async method
-                var task = Task.Run(() => _storageService.GetProfilesForGameAsync(gameId));
-                task.Wait();
-                var profilesFromStorage = task.Result;
-
-                // If profiles were found in storage, use them
-                if (profilesFromStorage != null && profilesFromStorage.Count > 0)
+                if (string.IsNullOrEmpty(gameId))
                 {
-                    App.LogToFile($"Found {profilesFromStorage.Count} profiles in storage for game '{gameId}'");
-                    _gameProfiles[gameId] = profilesFromStorage;
-
-                    // Also get the active profile ID
-                    var activeIdTask = Task.Run(() => _storageService.GetActiveProfileIdAsync(gameId));
-                    activeIdTask.Wait();
-                    string activeProfileId = activeIdTask.Result;
-
-                    if (!string.IsNullOrEmpty(activeProfileId))
-                    {
-                        App.LogToFile($"Found active profile ID in storage: {activeProfileId} for game '{gameId}'");
-                        _activeProfileIds[gameId] = activeProfileId;
-                    }
-                    else if (profilesFromStorage.Count > 0)
-                    {
-                        // Default to first profile if no active ID
-                        _activeProfileIds[gameId] = profilesFromStorage[0].Id;
-                        App.LogToFile($"No active profile found, setting first profile as active: {profilesFromStorage[0].Id}");
-
-                        // Save this active profile ID to storage
-                        var setActiveTask = Task.Run(() => _storageService.SetActiveProfileAsync(gameId, profilesFromStorage[0].Id));
-                        setActiveTask.Wait();
-                    }
-
-                    return _gameProfiles[gameId];
+                    App.LogService?.LogDebug("GetProfilesForGame: gameId is null or empty, returning empty list");
+                    return new List<ModProfile>();
                 }
-                else
+
+                // Log the normalized game ID we're using
+                App.LogService?.LogDebug($"GetProfilesForGame: Looking for profiles for normalized game ID '{gameId}'");
+
+                // First check if we already have profiles in memory
+                if (_gameProfiles.ContainsKey(gameId))
                 {
-                    App.LogToFile($"No profiles found in storage for game '{gameId}'");
+                    var profiles = _gameProfiles[gameId];
+                    App.LogService?.LogDebug($"Found {profiles.Count} profiles in memory for game '{gameId}'");
+                    return profiles;
                 }
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error checking storage for existing profiles: {ex.Message}");
-                // Continue to create default profile
-            }
 
-            // No profiles found in memory or storage, create a default profile
-            var defaultProfile = new ModProfile();
-            defaultProfile.Id = Guid.NewGuid().ToString();
+                // If not in memory, check storage before creating default
+                try
+                {
+                    // Create a synchronous wrapper around the async method
+                    var task = Task.Run(() => _storageService.GetProfilesForGameAsync(gameId));
+                    task.Wait();
+                    var profilesFromStorage = task.Result;
 
-            App.LogToFile($"Creating new default profile for game '{gameId}' with ID {defaultProfile.Id}");
+                    // If profiles were found in storage, use them
+                    if (profilesFromStorage != null && profilesFromStorage.Count > 0)
+                    {
+                        App.LogService?.LogDebug($"Found {profilesFromStorage.Count} profiles in storage for game '{gameId}'");
+                        _gameProfiles[gameId] = profilesFromStorage;
 
-            // Initialize the collections if needed
-            _gameProfiles[gameId] = new List<ModProfile> { defaultProfile };
-            _activeProfileIds[gameId] = defaultProfile.Id;
+                        // Also get the active profile ID
+                        var activeIdTask = Task.Run(() => _storageService.GetActiveProfileIdAsync(gameId));
+                        activeIdTask.Wait();
+                        string activeProfileId = activeIdTask.Result;
 
-            // Save this new profile to persistent storage
-            Task.Run(() => {
-                _storageService.SaveProfileAsync(gameId, defaultProfile);
-                _storageService.SetActiveProfileAsync(gameId, defaultProfile.Id);
-                SaveProfilesAsync();
-            }).ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(activeProfileId))
+                        {
+                            App.LogService?.LogDebug($"Found active profile ID in storage: {activeProfileId} for game '{gameId}'");
+                            _activeProfileIds[gameId] = activeProfileId;
+                        }
+                        else if (profilesFromStorage.Count > 0)
+                        {
+                            // Default to first profile if no active ID
+                            _activeProfileIds[gameId] = profilesFromStorage[0].Id;
+                            App.LogService?.LogDebug($"No active profile found, setting first profile as active: {profilesFromStorage[0].Id}");
 
-            return _gameProfiles[gameId];
+                            // Save this active profile ID to storage
+                            var setActiveTask = Task.Run(() => _storageService.SetActiveProfileAsync(gameId, profilesFromStorage[0].Id));
+                            setActiveTask.Wait();
+                        }
+
+                        return _gameProfiles[gameId];
+                    }
+                    else
+                    {
+                        App.LogService?.LogDebug($"No profiles found in storage for game '{gameId}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.LogService?.LogDebug($"Error checking storage for existing profiles: {ex.Message}");
+                    // Continue to create default profile
+                }
+
+                // No profiles found in memory or storage, create a default profile
+                var defaultProfile = new ModProfile();
+                defaultProfile.Id = Guid.NewGuid().ToString();
+
+                App.LogService?.Info($"Creating new default profile for game '{gameId}' with ID {defaultProfile.Id}");
+
+                // Initialize the collections if needed
+                _gameProfiles[gameId] = new List<ModProfile> { defaultProfile };
+                _activeProfileIds[gameId] = defaultProfile.Id;
+
+                // Save this new profile to persistent storage
+                Task.Run(() =>
+                {
+                    _storageService.SaveProfileAsync(gameId, defaultProfile);
+                    _storageService.SetActiveProfileAsync(gameId, defaultProfile.Id);
+                    SaveProfilesAsync();
+                }).ConfigureAwait(false);
+
+                return _gameProfiles[gameId];
+            }, "Get profiles for game", true, new List<ModProfile>());
         }
 
         // Get active profile
         public ModProfile GetActiveProfile(string gameId)
         {
-            // Normalize game ID
-            gameId = NormalizeGameId(gameId);
-
-            if (string.IsNullOrEmpty(gameId))
+            return ErrorHandler.ExecuteSafe(() =>
             {
-                return new ModProfile();
-            }
+                // Normalize game ID
+                gameId = NormalizeGameId(gameId);
 
-            // Make sure the profiles list exists
-            if (!_gameProfiles.ContainsKey(gameId))
-            {
-                GetProfilesForGame(gameId); // This creates a default profile if needed
-            }
-
-            // Get the active profile id
-            string activeProfileId = null;
-            if (_activeProfileIds.ContainsKey(gameId))
-            {
-                activeProfileId = _activeProfileIds[gameId];
-            }
-
-            // Find the active profile
-            if (!string.IsNullOrEmpty(activeProfileId))
-            {
-                foreach (var profile in _gameProfiles[gameId])
+                if (string.IsNullOrEmpty(gameId))
                 {
-                    if (profile.Id == activeProfileId)
+                    App.LogService?.LogDebug("GetActiveProfile: gameId is null or empty, returning new profile");
+                    return new ModProfile();
+                }
+
+                // Make sure the profiles list exists
+                if (!_gameProfiles.ContainsKey(gameId))
+                {
+                    App.LogService?.LogDebug($"GetActiveProfile: No profiles found for game '{gameId}', loading profiles");
+                    GetProfilesForGame(gameId); // This creates a default profile if needed
+                }
+
+                // Get the active profile id
+                string activeProfileId = null;
+                if (_activeProfileIds.ContainsKey(gameId))
+                {
+                    activeProfileId = _activeProfileIds[gameId];
+                    App.LogService?.LogDebug($"GetActiveProfile: Found active profile ID: {activeProfileId}");
+                }
+
+                // Find the active profile
+                if (!string.IsNullOrEmpty(activeProfileId))
+                {
+                    foreach (var profile in _gameProfiles[gameId])
                     {
-                        return profile;
+                        if (profile.Id == activeProfileId)
+                        {
+                            App.LogService?.LogDebug($"GetActiveProfile: Found active profile: {profile.Name}");
+                            return profile;
+                        }
                     }
                 }
-            }
 
-            // If no active profile found, use the first one
-            if (_gameProfiles[gameId].Count > 0)
-            {
-                var firstProfile = _gameProfiles[gameId][0];
-                _activeProfileIds[gameId] = firstProfile.Id; // Set as active
+                // If no active profile found, use the first one
+                if (_gameProfiles[gameId].Count > 0)
+                {
+                    var firstProfile = _gameProfiles[gameId][0];
+                    _activeProfileIds[gameId] = firstProfile.Id;
+                    App.LogService?.LogDebug($"GetActiveProfile: Using first profile as active: {firstProfile.Name}");
 
-                // Save this change
-                Task.Run(() => SaveProfilesAsync()).ConfigureAwait(false);
+                    // Save this change
+                    Task.Run(() => SaveProfilesAsync()).ConfigureAwait(false);
 
-                return firstProfile;
-            }
+                    return firstProfile;
+                }
 
-            // Shouldn't reach here normally, but create a new profile if needed
-            var newProfile = new ModProfile();
-            _gameProfiles[gameId] = new List<ModProfile> { newProfile };
-            _activeProfileIds[gameId] = newProfile.Id;
+                // Shouldn't reach here normally, but create a new profile if needed
+                App.LogService?.Warning("GetActiveProfile: No profiles found, creating new default profile");
+                var newProfile = new ModProfile();
+                _gameProfiles[gameId] = new List<ModProfile> { newProfile };
+                _activeProfileIds[gameId] = newProfile.Id;
 
-            return newProfile;
+                return newProfile;
+            }, "Get active profile", true, new ModProfile());
         }
 
         // Set active profile
         public async Task SetActiveProfileAsync(string gameId, string profileId)
         {
-            if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileId))
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                App.LogToFile("SetActiveProfileAsync: gameId or profileId is null");
-                return;
-            }
+                if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileId))
+                {
+                    App.LogService?.Warning("SetActiveProfileAsync: gameId or profileId is null");
+                    return;
+                }
 
-            // Always normalize the game ID
-            string normalizedGameId = NormalizeGameId(gameId);
+                // Always normalize the game ID
+                string normalizedGameId = NormalizeGameId(gameId);
 
-            App.LogToFile($"SetActiveProfileAsync: Setting profile '{profileId}' as active for game '{normalizedGameId}' (original: '{gameId}')");
+                App.LogService?.Info($"SetActiveProfileAsync: Setting profile '{profileId}' as active for game '{normalizedGameId}' (original: '{gameId}')");
 
-            // Update in-memory collection with normalized game ID
-            _activeProfileIds[normalizedGameId] = profileId;
+                // Update in-memory collection with normalized game ID
+                _activeProfileIds[normalizedGameId] = profileId;
 
-            // Save active profile ID to file storage
-            await _storageService.SetActiveProfileAsync(normalizedGameId, profileId);
+                // Save active profile ID to file storage
+                await _storageService.SetActiveProfileAsync(normalizedGameId, profileId);
 
-            // Verify by trying to read it back
-            string savedId = await _storageService.GetActiveProfileIdAsync(normalizedGameId);
-            if (savedId == profileId)
-            {
-                App.LogToFile($"Successfully verified active profile set to '{profileId}'");
-            }
-            else
-            {
-                App.LogToFile($"Warning: Failed to verify active profile ID (got '{savedId}' instead of '{profileId}')");
-            }
+                // Verify by trying to read it back
+                string savedId = await _storageService.GetActiveProfileIdAsync(normalizedGameId);
+                if (savedId == profileId)
+                {
+                    App.LogService?.LogDebug($"Successfully verified active profile set to '{profileId}'");
+                }
+                else
+                {
+                    App.LogService?.Warning($"Failed to verify active profile ID (got '{savedId}' instead of '{profileId}')");
+                }
+            }, $"Set active profile for game {gameId}", true);
         }
 
         // Update active profile mods
         public async Task UpdateActiveProfileModsAsync(string gameId, List<AppliedModSetting> mods)
         {
-            try
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
                 // Always normalize the game ID
                 string normalizedGameId = NormalizeGameId(gameId);
 
-                App.LogToFile($"UpdateActiveProfileModsAsync: Updating mods for game '{normalizedGameId}' (original: '{gameId}')");
+                App.LogService?.LogDebug($"UpdateActiveProfileModsAsync: Updating mods for game '{normalizedGameId}' (original: '{gameId}')");
 
                 if (string.IsNullOrEmpty(normalizedGameId))
                 {
-                    App.LogToFile("Game ID is null or empty - cannot update mods");
+                    App.LogService?.Error("Game ID is null or empty - cannot update mods");
                     return;
                 }
 
                 // Make sure we have the profiles dictionary for this game
                 if (!_gameProfiles.ContainsKey(normalizedGameId))
                 {
-                    App.LogToFile($"No profiles found for game '{normalizedGameId}', loading from storage first");
+                    App.LogService?.LogDebug($"No profiles found for game '{normalizedGameId}', loading from storage first");
 
                     // Try to load from storage before creating new profiles
                     var profiles = await _storageService.GetProfilesForGameAsync(normalizedGameId);
                     if (profiles != null && profiles.Count > 0)
                     {
                         _gameProfiles[normalizedGameId] = profiles;
-                        App.LogToFile($"Loaded {profiles.Count} profiles from storage");
+                        App.LogService?.LogDebug($"Loaded {profiles.Count} profiles from storage");
                     }
                     else
                     {
                         // Create a default profile if no profiles were found
-                        App.LogToFile($"No profiles found in storage, creating default profile");
+                        App.LogService?.LogDebug($"No profiles found in storage, creating default profile");
                         _gameProfiles[normalizedGameId] = new List<ModProfile> { new ModProfile() };
                     }
                 }
@@ -250,7 +267,7 @@ namespace AMO_Launcher.Services
                 if (_activeProfileIds.ContainsKey(normalizedGameId))
                 {
                     activeProfileId = _activeProfileIds[normalizedGameId];
-                    App.LogToFile($"Found active profile ID: {activeProfileId}");
+                    App.LogService?.LogDebug($"Found active profile ID: {activeProfileId}");
                 }
                 else
                 {
@@ -260,11 +277,11 @@ namespace AMO_Launcher.Services
                     if (!string.IsNullOrEmpty(activeProfileId))
                     {
                         _activeProfileIds[normalizedGameId] = activeProfileId;
-                        App.LogToFile($"Loaded active profile ID from storage: {activeProfileId}");
+                        App.LogService?.LogDebug($"Loaded active profile ID from storage: {activeProfileId}");
                     }
                     else
                     {
-                        App.LogToFile("No active profile ID found for this game");
+                        App.LogService?.LogDebug("No active profile ID found for this game");
                     }
                 }
 
@@ -275,11 +292,11 @@ namespace AMO_Launcher.Services
                     activeProfile = _gameProfiles[normalizedGameId].FirstOrDefault(p => p.Id == activeProfileId);
                     if (activeProfile != null)
                     {
-                        App.LogToFile($"Found active profile: {activeProfile.Name}");
+                        App.LogService?.LogDebug($"Found active profile: {activeProfile.Name}");
                     }
                     else
                     {
-                        App.LogToFile($"Active profile with ID {activeProfileId} not found");
+                        App.LogService?.Warning($"Active profile with ID {activeProfileId} not found");
                     }
                 }
 
@@ -288,7 +305,7 @@ namespace AMO_Launcher.Services
                 {
                     activeProfile = _gameProfiles[normalizedGameId][0];
                     _activeProfileIds[normalizedGameId] = activeProfile.Id;
-                    App.LogToFile($"Using first profile: {activeProfile.Name}");
+                    App.LogService?.LogDebug($"Using first profile: {activeProfile.Name}");
                 }
 
                 // If we have an active profile, update its mods
@@ -296,7 +313,7 @@ namespace AMO_Launcher.Services
                 {
                     activeProfile.AppliedMods = new List<AppliedModSetting>(mods);
                     activeProfile.LastModified = DateTime.Now;
-                    App.LogToFile($"Updated profile '{activeProfile.Name}' with {mods.Count} mods");
+                    App.LogService?.Info($"Updated profile '{activeProfile.Name}' with {mods.Count} mods");
 
                     // Save changes to persistent storage - always use normalized gameId
                     await _storageService.SaveProfileAsync(normalizedGameId, activeProfile);
@@ -304,33 +321,28 @@ namespace AMO_Launcher.Services
 
                     // Also save to settings for backward compatibility
                     _configService.SaveAppliedMods(normalizedGameId, mods);
-                    App.LogToFile("Saved mods to config service for backward compatibility");
+                    App.LogService?.LogDebug("Saved mods to config service for backward compatibility");
                 }
                 else
                 {
-                    App.LogToFile("No active profile available to update");
+                    App.LogService?.Warning("No active profile available to update");
                 }
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error in UpdateActiveProfileModsAsync: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-            }
+            }, $"Update active profile mods for game {gameId}", true);
         }
 
         // Create a new profile
         public async Task<ModProfile> CreateProfileAsync(string gameId, string profileName)
         {
-            try
+            return await ErrorHandler.ExecuteSafeAsync<ModProfile>(async () =>
             {
                 // Normalize gameId
                 gameId = NormalizeGameId(gameId);
 
-                App.LogToFile($"CreateProfileAsync: Creating profile '{profileName}' for game {gameId}");
+                App.LogService?.Info($"CreateProfileAsync: Creating profile '{profileName}' for game {gameId}");
 
                 if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileName))
                 {
-                    App.LogToFile("CreateProfileAsync: gameId or profileName is null");
+                    App.LogService?.Error("CreateProfileAsync: gameId or profileName is null");
                     return null;
                 }
 
@@ -343,13 +355,13 @@ namespace AMO_Launcher.Services
                 {
                     activeId = _activeProfileIds[gameId];
                     activeProfile = _gameProfiles[gameId].FirstOrDefault(p => p.Id == activeId);
-                    App.LogToFile($"Found active profile: {activeProfile?.Name} (ID: {activeId})");
+                    App.LogService?.LogDebug($"Found active profile: {activeProfile?.Name} (ID: {activeId})");
 
                     if (activeProfile != null)
                     {
                         // Save active profile to storage before creating a new one - don't change it
                         await _storageService.SaveProfileAsync(gameId, activeProfile);
-                        App.LogToFile($"Saved current active profile to storage");
+                        App.LogService?.LogDebug($"Saved current active profile to storage");
                     }
                 }
 
@@ -361,21 +373,24 @@ namespace AMO_Launcher.Services
                     LastModified = DateTime.Now,
                     AppliedMods = new List<AppliedModSetting>() // Initialize with empty list
                 };
-                App.LogToFile($"Created new profile object with ID: {newProfile.Id} and Name: {profileName}");
+                App.LogService?.Info($"Created new profile object with ID: {newProfile.Id} and Name: {profileName}");
 
                 // Make sure we have a list for this game
                 if (!_gameProfiles.ContainsKey(gameId))
                 {
                     _gameProfiles[gameId] = new List<ModProfile>();
-                    App.LogToFile($"Created new profiles collection for game {gameId}");
+                    App.LogService?.LogDebug($"Created new profiles collection for game {gameId}");
                 }
 
                 // Get current profiles list for debugging
                 var existingProfiles = _gameProfiles[gameId];
-                App.LogToFile($"Current profiles for game {gameId}:");
-                foreach (var p in existingProfiles)
+                if (App.LogService?.ShouldLogDebug() == true)
                 {
-                    App.LogToFile($"  - {p.Name} (ID: {p.Id})");
+                    App.LogService?.LogDebug($"Current profiles for game {gameId}:");
+                    foreach (var p in existingProfiles)
+                    {
+                        App.LogService?.LogDebug($"  - {p.Name} (ID: {p.Id})");
+                    }
                 }
 
                 // Ensure the name is unique
@@ -385,69 +400,65 @@ namespace AMO_Launcher.Services
                 while (_gameProfiles[gameId].Any(p => p.Name == newProfile.Name))
                 {
                     newProfile.Name = $"{baseName} ({counter++})";
-                    App.LogToFile($"Renamed profile to ensure uniqueness: {newProfile.Name}");
+                    App.LogService?.LogDebug($"Renamed profile to ensure uniqueness: {newProfile.Name}");
                 }
 
                 // Add the new profile to the collection
                 _gameProfiles[gameId].Add(newProfile);
-                App.LogToFile($"Added new profile to collection, now have {_gameProfiles[gameId].Count} profiles");
-
-                // IMPORTANT: Do NOT automatically set as active profile here
-                // Let the caller explicitly set it as active if needed
-                // _activeProfileIds[gameId] = newProfile.Id;
+                App.LogService?.LogDebug($"Added new profile to collection, now have {_gameProfiles[gameId].Count} profiles");
 
                 // Save the new profile to file
                 await _storageService.SaveProfileAsync(gameId, newProfile);
 
                 // Save changes to disk immediately
                 await SaveProfilesAsync();
-                App.LogToFile("Saved profiles to storage");
+                App.LogService?.Info("Saved profiles to storage");
 
                 // Verify the profile was added properly
-                App.LogToFile("Profiles after adding new one:");
-                foreach (var p in _gameProfiles[gameId])
+                if (App.LogService?.ShouldLogDebug() == true)
                 {
-                    App.LogToFile($"  - {p.Name} (ID: {p.Id})");
+                    App.LogService?.LogDebug("Profiles after adding new one:");
+                    foreach (var p in _gameProfiles[gameId])
+                    {
+                        App.LogService?.LogDebug($"  - {p.Name} (ID: {p.Id})");
+                    }
                 }
 
                 return newProfile;
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error in CreateProfileAsync: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-                return null;
-            }
+            }, $"Create profile '{profileName}' for game {gameId}", true);
         }
 
         // Delete a profile
         public async Task<bool> DeleteProfileAsync(string gameId, string profileId)
         {
-            try
+            return await ErrorHandler.ExecuteSafeAsync<bool>(async () =>
             {
                 // Normalize gameId
                 gameId = NormalizeGameId(gameId);
 
-                App.LogToFile($"DeleteProfileAsync: Deleting profile {profileId} from game {gameId}");
+                App.LogService?.Info($"DeleteProfileAsync: Deleting profile {profileId} from game {gameId}");
 
                 if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileId))
                 {
-                    App.LogToFile("DeleteProfileAsync: gameId or profileId is null");
+                    App.LogService?.Error("DeleteProfileAsync: gameId or profileId is null");
                     return false;
                 }
 
                 // Check if profiles list exists
                 if (!_gameProfiles.TryGetValue(gameId, out var profiles) || profiles == null)
                 {
-                    App.LogToFile($"DeleteProfileAsync: No profiles found for game {gameId}");
+                    App.LogService?.Warning($"DeleteProfileAsync: No profiles found for game {gameId}");
                     return false;
                 }
 
                 // Log all profiles before deletion
-                App.LogToFile($"Available profiles before deletion:");
-                foreach (var profile in profiles)
+                if (App.LogService?.ShouldLogDebug() == true)
                 {
-                    App.LogToFile($"  - {profile.Name} (ID: {profile.Id})");
+                    App.LogService?.LogDebug($"Available profiles before deletion:");
+                    foreach (var profile in profiles)
+                    {
+                        App.LogService?.LogDebug($"  - {profile.Name} (ID: {profile.Id})");
+                    }
                 }
 
                 // Find the profile
@@ -455,17 +466,17 @@ namespace AMO_Launcher.Services
 
                 if (profileToRemove == null)
                 {
-                    App.LogToFile($"DeleteProfileAsync: Profile with ID {profileId} not found");
+                    App.LogService?.Warning($"DeleteProfileAsync: Profile with ID {profileId} not found");
                     return false;
                 }
 
-                App.LogToFile($"Found profile to delete: {profileToRemove.Name} (ID: {profileId})");
+                App.LogService?.LogDebug($"Found profile to delete: {profileToRemove.Name} (ID: {profileId})");
 
                 // Check if it's the active profile
                 if (_activeProfileIds.TryGetValue(gameId, out string activeProfileId) &&
                     activeProfileId == profileId)
                 {
-                    App.LogToFile("This is the active profile, need to select another one");
+                    App.LogService?.LogDebug("This is the active profile, need to select another one");
 
                     // If we're removing the active profile, select another one
                     if (profiles.Count > 1)
@@ -476,12 +487,12 @@ namespace AMO_Launcher.Services
                         {
                             _activeProfileIds[gameId] = newActiveProfile.Id;
                             await _storageService.SetActiveProfileAsync(gameId, newActiveProfile.Id);
-                            App.LogToFile($"Set new active profile: {newActiveProfile.Name} (ID: {newActiveProfile.Id})");
+                            App.LogService?.Info($"Set new active profile: {newActiveProfile.Name} (ID: {newActiveProfile.Id})");
                         }
                     }
                     else
                     {
-                        App.LogToFile("This is the only profile, creating a new default profile");
+                        App.LogService?.LogDebug("This is the only profile, creating a new default profile");
                         // If this was the only profile, create a new default
                         var defaultProfile = new ModProfile();
                         _gameProfiles[gameId] = new List<ModProfile> { defaultProfile };
@@ -489,48 +500,48 @@ namespace AMO_Launcher.Services
                         await _storageService.SetActiveProfileAsync(gameId, defaultProfile.Id);
                         await _storageService.SaveProfileAsync(gameId, defaultProfile);
 
-                        App.LogToFile($"Created new default profile with ID: {defaultProfile.Id}");
+                        App.LogService?.Info($"Created new default profile with ID: {defaultProfile.Id}");
                         return true; // We've handled this special case
                     }
                 }
 
                 // Remove the profile from memory
                 bool removed = profiles.Remove(profileToRemove);
-                App.LogToFile($"Profile removed from memory: {removed}");
+                App.LogService?.LogDebug($"Profile removed from memory: {removed}");
 
                 // Delete profile file
                 bool fileDeleted = await _storageService.DeleteProfileAsync(gameId, profileId);
-                App.LogToFile($"Profile file deleted: {fileDeleted}");
+                App.LogService?.LogDebug($"Profile file deleted: {fileDeleted}");
 
                 // Log profiles after deletion
-                App.LogToFile($"Profiles after deletion:");
-                foreach (var profile in profiles)
+                if (App.LogService?.ShouldLogDebug() == true)
                 {
-                    App.LogToFile($"  - {profile.Name} (ID: {profile.Id})");
+                    App.LogService?.LogDebug($"Profiles after deletion:");
+                    foreach (var profile in profiles)
+                    {
+                        App.LogService?.LogDebug($"  - {profile.Name} (ID: {profile.Id})");
+                    }
                 }
 
                 // Save changes to disk
                 await SaveProfilesAsync();
-                App.LogToFile("Saved profiles after deletion");
+                App.LogService?.LogDebug("Saved profiles after deletion");
 
                 return removed;
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error in DeleteProfileAsync: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-                return false;
-            }
+            }, $"Delete profile from game {gameId}", true, false);
         }
 
         // Export profile to JSON
         public async Task<bool> ExportProfileAsync(string gameId, string profileId, string exportPath = null)
         {
-            try
+            return await ErrorHandler.ExecuteSafeAsync(async () =>
             {
+                App.LogService?.Info($"Exporting profile {profileId} from game {gameId}");
+
                 if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileId) ||
                     !_gameProfiles.ContainsKey(gameId))
                 {
+                    App.LogService?.Error("ExportProfileAsync: Invalid parameters");
                     return false;
                 }
 
@@ -538,6 +549,7 @@ namespace AMO_Launcher.Services
                 var profile = _gameProfiles[gameId].FirstOrDefault(p => p.Id == profileId);
                 if (profile == null)
                 {
+                    App.LogService?.Error($"Profile with ID {profileId} not found");
                     return false;
                 }
 
@@ -555,6 +567,7 @@ namespace AMO_Launcher.Services
 
                     // Ensure directory exists
                     Directory.CreateDirectory(Path.GetDirectoryName(exportPath));
+                    App.LogService?.LogDebug($"Created export path: {exportPath}");
                 }
 
                 // Serialize and save
@@ -564,33 +577,35 @@ namespace AMO_Launcher.Services
                 });
 
                 await File.WriteAllTextAsync(exportPath, json);
+                App.LogService?.Info($"Successfully exported profile '{profile.Name}' to {exportPath}");
+
                 return true;
-            }
-            catch
-            {
-                return false;
-            }
+            }, $"Export profile {profileId} from game {gameId}", true, false);
         }
 
         // Import profile from JSON
         public async Task<ModProfile> ImportProfileAsync(string gameId, string importPath = null)
         {
-            try
+            return await ErrorHandler.ExecuteSafeAsync<ModProfile>(async () =>
             {
+                App.LogService?.Info($"Importing profile for game {gameId}");
+
                 if (string.IsNullOrEmpty(gameId))
                 {
+                    App.LogService?.Error("ImportProfileAsync: gameId is null");
                     return null;
                 }
 
                 // If path not provided, a UI would normally prompt for selection
                 if (string.IsNullOrEmpty(importPath))
                 {
-                    // In a real app, you would show a file picker dialog here
+                    App.LogService?.Warning("Import path not provided");
                     return null;
                 }
 
                 if (!File.Exists(importPath))
                 {
+                    App.LogService?.Error($"Import file not found at path: {importPath}");
                     return null;
                 }
 
@@ -599,12 +614,15 @@ namespace AMO_Launcher.Services
 
                 if (importedProfile == null)
                 {
+                    App.LogService?.Error("Failed to deserialize profile from JSON");
                     return null;
                 }
 
                 // Generate a new ID to avoid conflicts
                 importedProfile.Id = Guid.NewGuid().ToString();
                 importedProfile.LastModified = DateTime.Now;
+
+                App.LogService?.LogDebug($"Imported profile: {importedProfile.Name}, assigned new ID: {importedProfile.Id}");
 
                 // Ensure the name is unique
                 string baseName = importedProfile.Name;
@@ -620,104 +638,110 @@ namespace AMO_Launcher.Services
                 while (_gameProfiles[gameId].Any(p => p.Name == importedProfile.Name))
                 {
                     importedProfile.Name = $"{baseName} (Imported {counter++})";
+                    App.LogService?.LogDebug($"Renamed profile to ensure uniqueness: {importedProfile.Name}");
                 }
 
                 // Add the profile
                 _gameProfiles[gameId].Add(importedProfile);
+                App.LogService?.Info($"Added imported profile '{importedProfile.Name}' to game {gameId}");
 
                 // Save to file storage
                 await _storageService.SaveProfileAsync(gameId, importedProfile);
 
                 return importedProfile;
-            }
-            catch
-            {
-                return null;
-            }
+            }, $"Import profile for game {gameId}", true);
         }
 
         // Update profile name
         public Task<bool> UpdateProfileNameAsync(string gameId, string profileId, string newName)
         {
-            try
+            return ErrorHandler.ExecuteSafeAsync(() =>
             {
+                App.LogService?.Info($"Updating name of profile {profileId} to '{newName}'");
+
                 if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileId) ||
                     string.IsNullOrEmpty(newName) || !_gameProfiles.ContainsKey(gameId))
                 {
+                    App.LogService?.Error("UpdateProfileNameAsync: Invalid parameters");
                     return Task.FromResult(false);
                 }
 
                 var profile = _gameProfiles[gameId].FirstOrDefault(p => p.Id == profileId);
                 if (profile == null)
                 {
+                    App.LogService?.Error($"Profile with ID {profileId} not found");
                     return Task.FromResult(false);
                 }
 
+                string oldName = profile.Name;
                 profile.Name = newName;
                 profile.LastModified = DateTime.Now;
+
+                App.LogService?.Info($"Renamed profile from '{oldName}' to '{newName}'");
 
                 // Save updated profile
                 _storageService.SaveProfileAsync(gameId, profile).ConfigureAwait(false);
 
                 return Task.FromResult(true);
-            }
-            catch
-            {
-                return Task.FromResult(false);
-            }
+            }, $"Update profile name for {profileId}", true, false);
         }
 
         // Create a duplicate of an existing profile
         public async Task<ModProfile> DuplicateProfileAsync(string gameId, string profileId, string newName = null)
         {
-            try
+            return await ErrorHandler.ExecuteSafeAsync<ModProfile>(async () =>
             {
+                App.LogService?.Info($"Duplicating profile {profileId} for game {gameId}");
+
                 if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(profileId) ||
                     !_gameProfiles.ContainsKey(gameId))
                 {
+                    App.LogService?.Error("DuplicateProfileAsync: Invalid parameters");
                     return null;
                 }
 
                 var sourceProfile = _gameProfiles[gameId].FirstOrDefault(p => p.Id == profileId);
                 if (sourceProfile == null)
                 {
+                    App.LogService?.Error($"Source profile with ID {profileId} not found");
                     return null;
                 }
 
                 // Create new profile with copy of applied mods
                 var duplicateProfile = new ModProfile
                 {
+                    Id = Guid.NewGuid().ToString(),
                     Name = newName ?? $"{sourceProfile.Name} (Copy)",
                     LastModified = DateTime.Now,
-                    AppliedMods = sourceProfile.AppliedMods.Select(m => new AppliedModSetting
+                    AppliedMods = sourceProfile.AppliedMods?.Select(m => new AppliedModSetting
                     {
                         ModFolderPath = m.ModFolderPath,
                         IsActive = m.IsActive,
                         IsFromArchive = m.IsFromArchive,
                         ArchiveSource = m.ArchiveSource,
                         ArchiveRootPath = m.ArchiveRootPath
-                    }).ToList()
+                    }).ToList() ?? new List<AppliedModSetting>()
                 };
+
+                App.LogService?.LogDebug($"Created duplicate profile with ID: {duplicateProfile.Id}, Name: {duplicateProfile.Name}");
+                App.LogService?.LogDebug($"Copied {duplicateProfile.AppliedMods?.Count ?? 0} mods to the new profile");
 
                 _gameProfiles[gameId].Add(duplicateProfile);
 
                 // Save to file storage
                 await _storageService.SaveProfileAsync(gameId, duplicateProfile);
+                App.LogService?.Info($"Successfully duplicated profile '{sourceProfile.Name}' to '{duplicateProfile.Name}'");
 
                 return duplicateProfile;
-            }
-            catch
-            {
-                return null;
-            }
+            }, $"Duplicate profile for game {gameId}", true);
         }
 
         // Save profiles to persistent storage
         public async Task SaveProfilesAsync()
         {
-            try
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                App.LogToFile("Saving profiles to persistent storage");
+                App.LogService?.Info("Saving profiles to persistent storage");
 
                 // Save profiles for each game
                 foreach (var gameId in _gameProfiles.Keys.ToList())  // Create a copy of keys to avoid modification issues
@@ -727,7 +751,7 @@ namespace AMO_Launcher.Services
                         // Skip empty game IDs
                         if (string.IsNullOrEmpty(gameId))
                         {
-                            App.LogToFile("Skipping empty gameId");
+                            App.LogService?.LogDebug("Skipping empty gameId");
                             continue;
                         }
 
@@ -737,22 +761,22 @@ namespace AMO_Launcher.Services
                         // Skip if no profiles to save
                         if (profiles == null || profiles.Count == 0)
                         {
-                            App.LogToFile($"No profiles to save for game {gameId}");
+                            App.LogService?.LogDebug($"No profiles to save for game {gameId}");
                             continue;
                         }
 
-                        App.LogToFile($"Saving {profiles.Count} profiles for game {gameId}");
+                        App.LogService?.LogDebug($"Saving {profiles.Count} profiles for game {gameId}");
 
                         foreach (var profile in profiles)
                         {
                             // Skip null profiles (shouldn't happen but let's be careful)
                             if (profile == null)
                             {
-                                App.LogToFile("Skipping null profile");
+                                App.LogService?.Warning("Skipping null profile");
                                 continue;
                             }
 
-                            App.LogToFile($"  - Profile: {profile.Name} (ID: {profile.Id}), Mods: {profile.AppliedMods?.Count ?? 0}");
+                            App.LogService?.Trace($"  - Profile: {profile.Name} (ID: {profile.Id}), Mods: {profile.AppliedMods?.Count ?? 0}");
 
                             // Save to file storage
                             await _storageService.SaveProfileAsync(gameId, profile);
@@ -766,36 +790,30 @@ namespace AMO_Launcher.Services
                         {
                             await _storageService.SetActiveProfileAsync(gameId, activeId);
                             await _configService.SaveActiveProfileIdAsync(gameId, activeId);
-                            App.LogToFile($"Saved active profile ID {activeId} for game {gameId}");
+                            App.LogService?.LogDebug($"Saved active profile ID {activeId} for game {gameId}");
                         }
                         else
                         {
-                            App.LogToFile($"No active profile ID for game {gameId}");
+                            App.LogService?.LogDebug($"No active profile ID for game {gameId}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        App.LogToFile($"Error saving profiles for game {gameId}: {ex.Message}");
-                        // Continue with next game
+                        // Log but continue with next game
+                        App.LogService?.Error($"Error saving profiles for game {gameId}: {ex.Message}");
                     }
                 }
 
-                App.LogToFile("Profiles saved successfully");
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error saving profiles: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-                // Don't rethrow - we want to keep running even if save fails
-            }
+                App.LogService?.Info("Profiles saved successfully");
+            }, "Save profiles", false);
         }
 
         // Load profiles from persistent storage
         public async Task LoadProfilesAsync()
         {
-            try
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                App.LogToFile("Loading profiles from persistent storage");
+                App.LogService?.Info("Loading profiles from persistent storage");
 
                 // Clear existing data
                 _gameProfiles.Clear();
@@ -807,7 +825,7 @@ namespace AMO_Launcher.Services
                 if (!loadedFromFiles)
                 {
                     // If nothing loaded from files, try loading from settings and migrate
-                    App.LogToFile("No profiles loaded from files, trying settings");
+                    App.LogService?.Info("No profiles loaded from files, trying settings");
                     await LoadProfilesFromSettingsAsync();
 
                     // Migrate profiles to file storage
@@ -817,46 +835,39 @@ namespace AMO_Launcher.Services
                 // Always normalize game IDs to ensure consistency
                 await NormalizeAllGameIdsAsync();
 
-                App.LogToFile($"Loaded profiles for {_gameProfiles.Count} games");
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error loading profiles: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-            }
+                App.LogService?.Info($"Loaded profiles for {_gameProfiles.Count} games");
+            }, "Load profiles from storage", true);
         }
 
         // Add this method to normalize all game IDs after loading
         private async Task NormalizeAllGameIdsAsync()
         {
-            try
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                App.LogToFile("Normalizing all game IDs after loading profiles");
+                App.LogService?.LogDebug("Normalizing all game IDs after loading profiles");
 
                 // Use the enhanced normalization
                 bool madeChanges = EnsureNormalizedGameIds();
 
                 if (madeChanges)
                 {
-                    App.LogToFile("Game ID normalization made changes - saving to storage");
+                    App.LogService?.Info("Game ID normalization made changes - saving to storage");
                     await SaveProfilesAsync();
                 }
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error normalizing game IDs: {ex.Message}");
-            }
+            }, "Normalize game IDs", false);
         }
 
         // Load profiles from files
         private async Task<bool> LoadProfilesFromFilesAsync()
         {
-            try
+            return await ErrorHandler.ExecuteSafeAsync(async () =>
             {
                 // Get all game IDs that have profiles
                 var gameIds = await _storageService.GetGameIdsWithProfilesAsync();
                 int totalProfilesLoaded = 0;
                 bool foundAnyProfiles = false;
+
+                App.LogService?.LogDebug($"Found {gameIds.Count} games with profiles in storage");
 
                 foreach (var gameId in gameIds)
                 {
@@ -874,35 +885,32 @@ namespace AMO_Launcher.Services
                         if (!string.IsNullOrEmpty(activeId))
                         {
                             _activeProfileIds[gameId] = activeId;
+                            App.LogService?.LogDebug($"Loaded active profile ID {activeId} for game {gameId}");
                         }
                         else if (profiles.Count > 0)
                         {
                             // Default to first profile if no active ID
                             _activeProfileIds[gameId] = profiles[0].Id;
+                            App.LogService?.LogDebug($"No active profile ID found, using first profile as active: {profiles[0].Id}");
                         }
 
-                        App.LogToFile($"Loaded {profiles.Count} profiles for game {gameId} from files");
+                        App.LogService?.LogDebug($"Loaded {profiles.Count} profiles for game {gameId} from files");
                     }
                 }
 
                 // Only return true if we found at least one profile and loaded something
                 return foundAnyProfiles && totalProfilesLoaded > 0;
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error loading profiles from files: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-                return false;
-            }
+            }, "Load profiles from files", false, false);
         }
 
         // Load profiles from settings
         private async Task LoadProfilesFromSettingsAsync()
         {
-            try
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
                 // Get all game IDs with saved profiles
                 var gameIds = await _configService.GetGameIdsWithProfilesAsync();
+                App.LogService?.LogDebug($"Found {gameIds.Count} games with profiles in settings");
 
                 foreach (var gameId in gameIds)
                 {
@@ -941,68 +949,61 @@ namespace AMO_Launcher.Services
                                 if (!string.IsNullOrEmpty(activeId))
                                 {
                                     _activeProfileIds[gameId] = activeId;
+                                    App.LogService?.LogDebug($"Loaded active profile ID {activeId} for game {gameId} from settings");
                                 }
                                 else if (validProfiles.Count > 0)
                                 {
                                     // Default to first profile if no active ID saved
                                     _activeProfileIds[gameId] = validProfiles[0].Id;
+                                    App.LogService?.LogDebug($"No active profile ID found in settings, using first profile: {validProfiles[0].Id}");
                                 }
 
-                                App.LogToFile($"Loaded {validProfiles.Count} profiles for game {gameId} from settings");
+                                App.LogService?.LogDebug($"Loaded {validProfiles.Count} profiles for game {gameId} from settings");
                             }
                         }
                         else
                         {
-                            App.LogToFile($"No profiles found in settings for game {gameId}");
+                            App.LogService?.LogDebug($"No profiles found in settings for game {gameId}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        App.LogToFile($"Error loading profiles for game {gameId}: {ex.Message}");
+                        // Log but continue with next game
+                        App.LogService?.Error($"Error loading profiles for game {gameId}: {ex.Message}");
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error loading profiles from settings: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-            }
+            }, "Load profiles from settings", false);
         }
 
         // Migrate profiles from settings to files
         private async Task MigrateProfilesToFilesAsync()
         {
-            try
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
                 if (_gameProfiles.Count == 0)
                 {
-                    App.LogToFile("No profiles to migrate");
+                    App.LogService?.LogDebug("No profiles to migrate");
                     return;
                 }
 
-                App.LogToFile($"Migrating {_gameProfiles.Count} games' profiles to files");
+                App.LogService?.Info($"Migrating {_gameProfiles.Count} games' profiles to files");
 
                 // Migrate profiles and active profile IDs
                 await _storageService.MigrateFromSettingsAsync(_gameProfiles, _activeProfileIds);
 
-                App.LogToFile("Migration complete");
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error migrating profiles to files: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-            }
+                App.LogService?.Info("Migration complete");
+            }, "Migrate profiles to files", false);
         }
 
         public Task<ModProfile> ImportProfileDirectAsync(string gameId, ModProfile importedProfile)
         {
-            try
+            return ErrorHandler.ExecuteSafeAsync<ModProfile>(() =>
             {
-                App.LogToFile($"ImportProfileDirectAsync: Importing profile for game {gameId}");
+                App.LogService?.Info($"ImportProfileDirectAsync: Importing profile for game {gameId}");
 
                 if (string.IsNullOrEmpty(gameId) || importedProfile == null)
                 {
-                    App.LogToFile("ImportProfileDirectAsync: gameId is null or importedProfile is null");
+                    App.LogService?.Error("ImportProfileDirectAsync: gameId is null or importedProfile is null");
                     return Task.FromResult<ModProfile>(null);
                 }
 
@@ -1010,24 +1011,18 @@ namespace AMO_Launcher.Services
                 if (!_gameProfiles.ContainsKey(gameId))
                 {
                     _gameProfiles[gameId] = new List<ModProfile>();
-                    App.LogToFile($"Created new profiles collection for game {gameId}");
+                    App.LogService?.LogDebug($"Created new profiles collection for game {gameId}");
                 }
 
                 // Add the profile
                 _gameProfiles[gameId].Add(importedProfile);
-                App.LogToFile($"Added profile {importedProfile.Name} to game {gameId}");
+                App.LogService?.Info($"Added profile {importedProfile.Name} to game {gameId}");
 
                 // Save to file storage
                 _storageService.SaveProfileAsync(gameId, importedProfile).ConfigureAwait(false);
 
                 return Task.FromResult(importedProfile);
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error in ImportProfileDirectAsync: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-                return Task.FromResult<ModProfile>(null);
-            }
+            }, $"Import profile directly for game {gameId}", true);
         }
 
         private string NormalizeGameId(string gameId)
@@ -1035,21 +1030,21 @@ namespace AMO_Launcher.Services
             if (string.IsNullOrEmpty(gameId))
                 return gameId;
 
-            // First, trim any whitespace
+            // Trim any whitespace
             gameId = gameId.Trim();
 
             // Remove any numeric suffix after underscore
             int underscoreIndex = gameId.IndexOf('_');
             if (underscoreIndex > 0)
             {
-                // Take only the part before the underscore, ignore everything after
+                // Take only the part before the underscore
                 return gameId.Substring(0, underscoreIndex);
             }
 
             return gameId;
         }
 
-        // Add this method to consistently normalize game IDs everywhere in the class
+        // Helper method to ensure consistent game ID normalization
         private bool EnsureNormalizedGameIds()
         {
             bool madeChanges = false;
@@ -1065,12 +1060,12 @@ namespace AMO_Launcher.Services
                 if (normalizedId == gameId)
                     continue;
 
-                App.LogToFile($"Converting game ID from '{gameId}' to normalized form '{normalizedId}'");
+                App.LogService?.Info($"Converting game ID from '{gameId}' to normalized form '{normalizedId}'");
 
                 // If profiles already exist for normalized ID, merge them
                 if (_gameProfiles.ContainsKey(normalizedId))
                 {
-                    App.LogToFile($"Merging {_gameProfiles[gameId].Count} profiles from '{gameId}' to existing '{normalizedId}'");
+                    App.LogService?.LogDebug($"Merging {_gameProfiles[gameId].Count} profiles from '{gameId}' to existing '{normalizedId}'");
 
                     // Add any non-duplicate profiles to the normalized entry
                     foreach (var profile in _gameProfiles[gameId])
@@ -1085,7 +1080,7 @@ namespace AMO_Launcher.Services
                 else
                 {
                     // Just move the profiles to the normalized ID
-                    App.LogToFile($"Moving {_gameProfiles[gameId].Count} profiles from '{gameId}' to new normalized ID '{normalizedId}'");
+                    App.LogService?.LogDebug($"Moving {_gameProfiles[gameId].Count} profiles from '{gameId}' to new normalized ID '{normalizedId}'");
                     _gameProfiles[normalizedId] = _gameProfiles[gameId];
                     madeChanges = true;
                 }
@@ -1099,7 +1094,7 @@ namespace AMO_Launcher.Services
                     string activeId = _activeProfileIds[gameId];
                     _activeProfileIds[normalizedId] = activeId;
                     _activeProfileIds.Remove(gameId);
-                    App.LogToFile($"Moved active profile ID '{activeId}' from '{gameId}' to '{normalizedId}'");
+                    App.LogService?.LogDebug($"Moved active profile ID '{activeId}' from '{gameId}' to '{normalizedId}'");
                     madeChanges = true;
                 }
             }
@@ -1109,9 +1104,9 @@ namespace AMO_Launcher.Services
 
         public async Task MigrateGameProfilesAsync()
         {
-            try
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                App.LogToFile("Starting game profile ID normalization...");
+                App.LogService?.Info("Starting game profile ID normalization...");
 
                 // First, run the enhanced normalization process
                 bool madeChanges = EnsureNormalizedGameIds();
@@ -1119,24 +1114,19 @@ namespace AMO_Launcher.Services
                 // If changes were made, save everything
                 if (madeChanges)
                 {
-                    App.LogToFile("Changes were made during profile ID normalization - saving profiles");
+                    App.LogService?.LogDebug("Changes were made during profile ID normalization - saving profiles");
                     await SaveProfilesAsync();
                 }
 
-                App.LogToFile("Game profile ID normalization completed successfully");
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error during game profile ID normalization: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-            }
+                App.LogService?.Info("Game profile ID normalization completed successfully");
+            }, "Migrate game profiles", true);
         }
 
         public async Task DeduplicateProfilesAsync()
         {
-            try
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                App.LogToFile("Starting profile deduplication");
+                App.LogService?.Info("Starting profile deduplication");
                 bool changesDetected = false;
 
                 // Process each game ID
@@ -1164,6 +1154,7 @@ namespace AMO_Launcher.Services
                             if (uniqueProfiles.ContainsKey("Default"))
                             {
                                 duplicates.Add(profile);
+                                App.LogService?.LogDebug($"Found duplicate default profile (ID: {profile.Id})");
                             }
                             else
                             {
@@ -1186,11 +1177,13 @@ namespace AMO_Launcher.Services
                                 if (newModCount > existingModCount ||
                                     profile.LastModified > existing.LastModified)
                                 {
+                                    App.LogService?.LogDebug($"Replacing profile '{existing.Name}' with newer/more complete version");
                                     duplicates.Add(existing);
                                     uniqueProfiles[key] = profile;
                                 }
                                 else
                                 {
+                                    App.LogService?.LogDebug($"Found duplicate profile: {profile.Name} (ID: {profile.Id})");
                                     duplicates.Add(profile);
                                 }
                             }
@@ -1205,7 +1198,7 @@ namespace AMO_Launcher.Services
                     if (duplicates.Count == 0)
                         continue;
 
-                    App.LogToFile($"Found {duplicates.Count} duplicate profiles for game {gameId}");
+                    App.LogService?.Info($"Found {duplicates.Count} duplicate profiles for game {gameId}");
                     changesDetected = true;
 
                     // Check if active profile is among duplicates
@@ -1215,6 +1208,10 @@ namespace AMO_Launcher.Services
                     if (!string.IsNullOrEmpty(activeId))
                     {
                         needNewActiveProfile = duplicates.Any(p => p.Id == activeId);
+                        if (needNewActiveProfile)
+                        {
+                            App.LogService?.LogDebug("Active profile is among duplicates to be removed");
+                        }
                     }
 
                     // Remove duplicates from the list
@@ -1224,7 +1221,7 @@ namespace AMO_Launcher.Services
 
                         // Delete the duplicate file as well
                         await _storageService.DeleteProfileAsync(gameId, duplicate.Id);
-                        App.LogToFile($"Deleted duplicate profile: {duplicate.Name} (ID: {duplicate.Id})");
+                        App.LogService?.LogDebug($"Deleted duplicate profile: {duplicate.Name} (ID: {duplicate.Id})");
                     }
 
                     // Update active profile if needed
@@ -1232,7 +1229,7 @@ namespace AMO_Launcher.Services
                     {
                         _activeProfileIds[gameId] = profiles[0].Id;
                         await _storageService.SetActiveProfileAsync(gameId, profiles[0].Id);
-                        App.LogToFile($"Updated active profile to: {profiles[0].Name} (ID: {profiles[0].Id})");
+                        App.LogService?.Info($"Updated active profile to: {profiles[0].Name} (ID: {profiles[0].Id})");
                     }
                 }
 
@@ -1240,39 +1237,34 @@ namespace AMO_Launcher.Services
                 if (changesDetected)
                 {
                     await SaveProfilesAsync();
-                    App.LogToFile("Profile deduplication complete - changes saved");
+                    App.LogService?.Info("Profile deduplication complete - changes saved");
                 }
                 else
                 {
-                    App.LogToFile("Profile deduplication complete - no duplicates found");
+                    App.LogService?.Info("Profile deduplication complete - no duplicates found");
                 }
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error during profile deduplication: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-            }
+            }, "Deduplicate profiles", true);
         }
 
         public ModProfile GetFullyLoadedActiveProfile(string gameId)
         {
-            try
+            return ErrorHandler.ExecuteSafe(() =>
             {
-                App.LogToFile($"GetFullyLoadedActiveProfile: Loading active profile for game {gameId}");
+                App.LogService?.LogDebug($"GetFullyLoadedActiveProfile: Loading active profile for game {gameId}");
 
                 // Normalize game ID
                 gameId = NormalizeGameId(gameId);
 
                 if (string.IsNullOrEmpty(gameId))
                 {
-                    App.LogToFile("Game ID is null or empty");
+                    App.LogService?.Warning("Game ID is null or empty");
                     return new ModProfile();
                 }
 
                 // Make sure the profiles list exists
                 if (!_gameProfiles.ContainsKey(gameId))
                 {
-                    App.LogToFile($"No profiles found in memory for {gameId}, trying to load from storage");
+                    App.LogService?.LogDebug($"No profiles found in memory for {gameId}, trying to load from storage");
                     // Load profiles from file storage
                     var loadProfilesTask = _storageService.GetProfilesForGameAsync(gameId);
                     loadProfilesTask.Wait();
@@ -1281,11 +1273,11 @@ namespace AMO_Launcher.Services
                     if (profiles != null && profiles.Count > 0)
                     {
                         _gameProfiles[gameId] = profiles;
-                        App.LogToFile($"Loaded {profiles.Count} profiles from storage for {gameId}");
+                        App.LogService?.LogDebug($"Loaded {profiles.Count} profiles from storage for {gameId}");
                     }
                     else
                     {
-                        App.LogToFile($"No profiles found in storage for {gameId}, getting default profiles");
+                        App.LogService?.LogDebug($"No profiles found in storage for {gameId}, getting default profiles");
                         GetProfilesForGame(gameId); // This creates a default profile if needed
                     }
                 }
@@ -1295,7 +1287,7 @@ namespace AMO_Launcher.Services
                 if (_activeProfileIds.ContainsKey(gameId))
                 {
                     activeProfileId = _activeProfileIds[gameId];
-                    App.LogToFile($"Found active profile ID in memory: {activeProfileId}");
+                    App.LogService?.LogDebug($"Found active profile ID in memory: {activeProfileId}");
                 }
                 else
                 {
@@ -1307,7 +1299,7 @@ namespace AMO_Launcher.Services
                     if (!string.IsNullOrEmpty(activeProfileId))
                     {
                         _activeProfileIds[gameId] = activeProfileId;
-                        App.LogToFile($"Loaded active profile ID from storage: {activeProfileId}");
+                        App.LogService?.LogDebug($"Loaded active profile ID from storage: {activeProfileId}");
                     }
                 }
 
@@ -1318,7 +1310,7 @@ namespace AMO_Launcher.Services
                     activeProfile = _gameProfiles[gameId].FirstOrDefault(p => p.Id == activeProfileId);
                     if (activeProfile != null)
                     {
-                        App.LogToFile($"Found active profile: {activeProfile.Name} with {activeProfile.AppliedMods?.Count ?? 0} mods");
+                        App.LogService?.LogDebug($"Found active profile: {activeProfile.Name} with {activeProfile.AppliedMods?.Count ?? 0} mods");
 
                         // Make sure AppliedMods is initialized
                         if (activeProfile.AppliedMods == null)
@@ -1330,7 +1322,7 @@ namespace AMO_Launcher.Services
                     }
                     else
                     {
-                        App.LogToFile($"Active profile with ID {activeProfileId} not found in memory");
+                        App.LogService?.Warning($"Active profile with ID {activeProfileId} not found in memory");
                     }
                 }
 
@@ -1343,14 +1335,14 @@ namespace AMO_Launcher.Services
 
                     if (File.Exists(profilePath))
                     {
-                        App.LogToFile($"Loading active profile directly from file: {profilePath}");
+                        App.LogService?.LogDebug($"Loading active profile directly from file: {profilePath}");
                         var loadProfileTask = _storageService.LoadProfileAsync(profilePath);
                         loadProfileTask.Wait();
                         activeProfile = loadProfileTask.Result;
 
                         if (activeProfile != null)
                         {
-                            App.LogToFile($"Successfully loaded profile from file: {activeProfile.Name}");
+                            App.LogService?.LogDebug($"Successfully loaded profile from file: {activeProfile.Name}");
 
                             // Add to in-memory collection if not already there
                             if (_gameProfiles.ContainsKey(gameId) &&
@@ -1380,7 +1372,7 @@ namespace AMO_Launcher.Services
                     var setActiveTask = _storageService.SetActiveProfileAsync(gameId, activeProfile.Id);
                     setActiveTask.Wait();
 
-                    App.LogToFile($"Using first profile as active: {activeProfile.Name}");
+                    App.LogService?.LogDebug($"Using first profile as active: {activeProfile.Name}");
 
                     // Make sure AppliedMods is initialized
                     if (activeProfile.AppliedMods == null)
@@ -1392,8 +1384,10 @@ namespace AMO_Launcher.Services
                 }
 
                 // Still nothing found, create a new default profile
-                App.LogToFile("Creating new default profile as last resort");
+                App.LogService?.Warning("Creating new default profile as last resort");
                 var newProfile = new ModProfile();
+                newProfile.Id = Guid.NewGuid().ToString();
+                newProfile.AppliedMods = new List<AppliedModSetting>();
 
                 if (!_gameProfiles.ContainsKey(gameId))
                 {
@@ -1410,13 +1404,7 @@ namespace AMO_Launcher.Services
                 setActiveIdTask.Wait();
 
                 return newProfile;
-            }
-            catch (Exception ex)
-            {
-                App.LogToFile($"Error in GetFullyLoadedActiveProfile: {ex.Message}");
-                App.LogToFile($"Stack trace: {ex.StackTrace}");
-                return new ModProfile(); // Return empty profile in case of error
-            }
+            }, $"Get fully loaded active profile for game {gameId}", true, new ModProfile());
         }
     }
 }

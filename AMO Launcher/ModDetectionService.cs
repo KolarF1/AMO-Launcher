@@ -1,4 +1,5 @@
 ﻿using AMO_Launcher.Models;
+using AMO_Launcher.Utilities;
 using Newtonsoft.Json;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
@@ -19,411 +20,633 @@ namespace AMO_Launcher.Services
 {
     public class ModDetectionService
     {
-        private readonly string _modsBasePath;
+        // All fields are initialized directly at declaration - no need to assign in constructor
+        private readonly string _modsBasePath = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory,
+            "Mods");
+
         private BitmapImage _defaultModIcon;
         private readonly string[] _supportedArchiveExtensions = { ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2" };
 
         public ModDetectionService()
         {
-            // Get the folder where the application is running
-            string appPath = AppDomain.CurrentDomain.BaseDirectory;
-            _modsBasePath = Path.Combine(appPath, "Mods");
+            // Initialize the default icon without depending on ReadOnly fields
+            InitializeDefaultIcon();
 
-            // Ensure the Mods folder exists
-            if (!Directory.Exists(_modsBasePath))
+            // Perform error-handled initialization that doesn't modify readonly fields
+            InitializeFolders();
+        }
+
+        // Separating icon initialization for clarity
+        private void InitializeDefaultIcon()
+        {
+            _defaultModIcon = ErrorHandler.ExecuteSafe<BitmapImage>(() =>
             {
-                Directory.CreateDirectory(_modsBasePath);
-                System.Diagnostics.Debug.WriteLine($"Created Mods folder at {_modsBasePath}");
-            }
+                App.LogService.LogDebug("Loading default mod icon");
 
-            // Load default mod icon
-            _defaultModIcon = LoadDefaultModIcon();
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.UriSource = new Uri("pack://application:,,,/AMO_Launcher;component/Resources/DefaultModIcon.png");
+                    bitmap.EndInit();
+                    bitmap.Freeze(); // Make it thread safe
+                    App.LogService.LogDebug("Default icon loaded successfully");
+                    return bitmap;
+                }
+                catch (Exception ex)
+                {
+                    App.LogService.Error($"Error loading default mod icon: {ex.Message}");
+                    App.LogService.LogDebug($"Exception details: {ex}");
+                    return null;
+                }
+            }, "Loading default mod icon", false);
+        }
+
+        // Separating folder initialization to avoid readonly field conflicts
+        private void InitializeFolders()
+        {
+            ErrorHandler.ExecuteSafe(() =>
+            {
+                App.LogService.Info("Initializing ModDetectionService");
+                App.LogService.LogDebug($"Mods base path set to: {_modsBasePath}");
+
+                // Ensure the Mods folder exists
+                if (!Directory.Exists(_modsBasePath))
+                {
+                    App.LogService.LogDebug($"Creating Mods folder at {_modsBasePath}");
+                    Directory.CreateDirectory(_modsBasePath);
+                    App.LogService.Info($"Created Mods folder at {_modsBasePath}");
+                }
+
+                App.LogService.Info("ModDetectionService initialized successfully");
+            }, "ModDetectionService initialization");
         }
 
         // Get or create the game-specific mods folder
         public string GetGameModsFolder(GameInfo game)
         {
-            if (game == null) return null;
-
-            // Use game name as folder name (replace invalid chars)
-            string gameFolderName = string.Join("_", game.Name.Split(Path.GetInvalidFileNameChars()));
-            string gameModsPath = Path.Combine(_modsBasePath, gameFolderName);
-
-            // Create the folder if it doesn't exist
-            if (!Directory.Exists(gameModsPath))
+            return ErrorHandler.ExecuteSafe<string>(() =>
             {
-                Directory.CreateDirectory(gameModsPath);
-                System.Diagnostics.Debug.WriteLine($"Created game mods folder at {gameModsPath}");
-            }
+                if (game == null)
+                {
+                    App.LogService.Warning("GetGameModsFolder called with null game");
+                    return null;
+                }
 
-            return gameModsPath;
+                // Use game name as folder name (replace invalid chars)
+                string gameFolderName = string.Join("_", game.Name.Split(Path.GetInvalidFileNameChars()));
+                string gameModsPath = Path.Combine(_modsBasePath, gameFolderName);
+                App.LogService.LogDebug($"Game mods folder path: {gameModsPath}");
+
+                // Create the folder if it doesn't exist
+                if (!Directory.Exists(gameModsPath))
+                {
+                    App.LogService.LogDebug($"Creating game mods folder at {gameModsPath}");
+                    Directory.CreateDirectory(gameModsPath);
+                    App.LogService.Info($"Created game mods folder for {game.Name}");
+                }
+
+                return gameModsPath;
+            }, "Getting game mods folder", true, null);
         }
 
         // Check if a file is a supported archive
         private bool IsArchiveFile(string filePath)
         {
-            string extension = Path.GetExtension(filePath).ToLowerInvariant();
-            return _supportedArchiveExtensions.Contains(extension);
+            return ErrorHandler.ExecuteSafe<bool>(() =>
+            {
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    App.LogService.Warning("IsArchiveFile called with null or empty path");
+                    return false;
+                }
+
+                string extension = Path.GetExtension(filePath).ToLowerInvariant();
+                bool result = _supportedArchiveExtensions.Contains(extension);
+
+                App.LogService.Trace($"Checking if file is archive: {filePath} - Result: {result}");
+                return result;
+            }, "Checking archive file", false, false);
         }
 
         // Process archives in the game's mod folder without extracting
         private async Task ProcessArchivesAsync(string gameModsFolder, string gameName, List<ModInfo> mods)
         {
-            foreach (var archivePath in Directory.GetFiles(gameModsFolder).Where(f => IsArchiveFile(f)))
+            await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                try
+                if (string.IsNullOrEmpty(gameModsFolder) || !Directory.Exists(gameModsFolder))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Processing archive file: {archivePath}");
+                    App.LogService.Warning($"ProcessArchivesAsync called with invalid folder: {gameModsFolder}");
+                    return;
+                }
 
-                    // Read the mod data from the archive
-                    var mod = await LoadModFromArchivePathAsync(archivePath, gameName);
-                    if (mod != null)
+                App.LogService.LogDebug($"Processing archive files in {gameModsFolder}");
+                var archiveFiles = Directory.GetFiles(gameModsFolder).Where(f => IsArchiveFile(f)).ToList();
+                App.LogService.LogDebug($"Found {archiveFiles.Count} archive files");
+
+                int processedCount = 0;
+                int successCount = 0;
+
+                foreach (var archivePath in archiveFiles)
+                {
+                    processedCount++;
+                    App.LogService.LogDebug($"Processing archive file ({processedCount}/{archiveFiles.Count}): {Path.GetFileName(archivePath)}");
+
+                    try
                     {
-                        mods.Add(mod);
-                        System.Diagnostics.Debug.WriteLine($"Loaded mod from archive: {mod.Name} by {mod.Author}");
+                        // Create operation context for this archive
+                        string archiveFileName = Path.GetFileName(archivePath);
+
+                        // Read the mod data from the archive
+                        var mod = await LoadModFromArchivePathAsync(archivePath, gameName);
+                        if (mod != null)
+                        {
+                            mods.Add(mod);
+                            successCount++;
+                            App.LogService.LogDebug($"Successfully loaded mod from archive: {mod.Name} by {mod.Author}");
+                        }
+                        else
+                        {
+                            App.LogService.LogDebug($"No valid mod found in archive: {archiveFileName}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log but continue with next archive
+                        App.LogService.Error($"Error processing archive {Path.GetFileName(archivePath)}: {ex.Message}");
+                        App.LogService.LogDebug($"Archive error details: {ex}");
                     }
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error processing archive {archivePath}: {ex.Message}");
-                }
-            }
+
+                App.LogService.Info($"Archive processing complete: {successCount} of {archiveFiles.Count} archives contained valid mods");
+            }, "Processing archive files");
         }
 
         // Load mod from archive without extracting (accessible publicly)
         public async Task<ModInfo> LoadModFromArchivePathAsync(string archivePath, string currentGameName, string rootPath = null)
         {
-            return await Task.Run(() =>
+            return await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                try
+                // Validate inputs
+                if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
                 {
-                    using (var archive = ArchiveFactory.Open(archivePath))
-                    {
-                        // Look for mod.json in the archive
-                        var modJsonEntry = archive.Entries.FirstOrDefault(e =>
-                            Path.GetFileName(e.Key).Equals("mod.json", StringComparison.OrdinalIgnoreCase));
-
-                        if (modJsonEntry == null)
-                        {
-                            // Try to look in subdirectories
-                            modJsonEntry = archive.Entries.FirstOrDefault(e =>
-                                e.Key.EndsWith("/mod.json", StringComparison.OrdinalIgnoreCase) ||
-                                e.Key.EndsWith("\\mod.json", StringComparison.OrdinalIgnoreCase));
-                        }
-
-                        if (modJsonEntry == null)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"No mod.json found in archive {archivePath}");
-                            return null;
-                        }
-
-                        string modJsonContent;
-                        using (var reader = new StreamReader(modJsonEntry.OpenEntryStream()))
-                        {
-                            modJsonContent = reader.ReadToEnd();
-                        }
-
-                        // Parse the mod.json content
-                        var modData = ParseModJson(modJsonContent); // Use the new method
-
-                        // Skip this mod if it doesn't specify a game or doesn't match the current game
-                        if (string.IsNullOrEmpty(modData.Game) ||
-                            !modData.Game.Equals(currentGameName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Mod in {archivePath} has no game specified or doesn't match current game");
-                            return null;
-                        }
-
-                        // Get the parent directory of mod.json to determine the root path inside the archive
-                        string modRootInArchive = rootPath;
-                        if (string.IsNullOrEmpty(modRootInArchive))
-                        {
-                            modRootInArchive = Path.GetDirectoryName(modJsonEntry.Key)?.Replace('\\', '/') ?? "";
-                            if (!string.IsNullOrEmpty(modRootInArchive) && !modRootInArchive.EndsWith("/"))
-                            {
-                                modRootInArchive += "/";
-                            }
-                        }
-
-                        // Create mod info
-                        var modInfo = new ModInfo
-                        {
-                            Name = string.IsNullOrEmpty(modData.Name) ? "Unknown Mod" : modData.Name,
-                            Description = modData.Description ?? "",
-                            Version = string.IsNullOrEmpty(modData.Version) ? "N/A" : modData.Version,
-                            Author = string.IsNullOrEmpty(modData.Author) ? "Unknown" : modData.Author,
-                            Game = modData.Game,
-                            Category = modData.Category ?? "Uncategorized", // Handle the category
-                            IsFromArchive = true,
-                            ArchiveSource = archivePath,
-                            ArchiveRootPath = modRootInArchive
-                        };
-
-                        // Look for icon.png in the archive
-                        var iconEntry = archive.Entries.FirstOrDefault(e =>
-                            Path.GetFileName(e.Key).Equals("icon.png", StringComparison.OrdinalIgnoreCase) &&
-                            Path.GetDirectoryName(e.Key)?.Replace('\\', '/') == modRootInArchive.TrimEnd('/'));
-
-                        if (iconEntry != null)
-                        {
-                            try
-                            {
-                                using (var stream = iconEntry.OpenEntryStream())
-                                {
-                                    var memoryStream = new MemoryStream();
-                                    stream.CopyTo(memoryStream);
-                                    memoryStream.Position = 0;
-
-                                    var bitmap = new BitmapImage();
-                                    bitmap.BeginInit();
-                                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                                    bitmap.StreamSource = memoryStream;
-                                    bitmap.EndInit();
-                                    bitmap.Freeze(); // Make it thread safe
-
-                                    modInfo.Icon = bitmap;
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Error loading icon from archive {archivePath}: {ex.Message}");
-                                modInfo.Icon = _defaultModIcon;
-                            }
-                        }
-                        else
-                        {
-                            modInfo.Icon = _defaultModIcon;
-                        }
-
-                        return modInfo;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error reading mod from archive {archivePath}: {ex.Message}");
+                    App.LogService.Warning($"LoadModFromArchivePathAsync called with invalid path: {archivePath}");
                     return null;
                 }
-            });
+
+                if (string.IsNullOrEmpty(currentGameName))
+                {
+                    App.LogService.Warning("LoadModFromArchivePathAsync called with empty game name");
+                    return null;
+                }
+
+                string archiveFileName = Path.GetFileName(archivePath);
+                App.LogService.LogDebug($"Loading mod from archive: {archiveFileName}");
+
+                return await Task.Run(() =>
+                {
+                    try
+                    {
+                        using (var archive = ArchiveFactory.Open(archivePath))
+                        {
+                            App.LogService.Trace($"Archive opened successfully: {archiveFileName} - {archive.Entries.Count()} entries");
+
+                            // Look for mod.json in the archive
+                            var modJsonEntry = archive.Entries.FirstOrDefault(e =>
+                                Path.GetFileName(e.Key).Equals("mod.json", StringComparison.OrdinalIgnoreCase));
+
+                            if (modJsonEntry == null)
+                            {
+                                // Try to look in subdirectories
+                                modJsonEntry = archive.Entries.FirstOrDefault(e =>
+                                    e.Key.EndsWith("/mod.json", StringComparison.OrdinalIgnoreCase) ||
+                                    e.Key.EndsWith("\\mod.json", StringComparison.OrdinalIgnoreCase));
+                            }
+
+                            if (modJsonEntry == null)
+                            {
+                                App.LogService.LogDebug($"No mod.json found in archive {archiveFileName}");
+                                return null;
+                            }
+
+                            App.LogService.Trace($"Found mod.json at {modJsonEntry.Key}");
+
+                            string modJsonContent;
+                            using (var reader = new StreamReader(modJsonEntry.OpenEntryStream()))
+                            {
+                                modJsonContent = reader.ReadToEnd();
+                            }
+
+                            // Parse the mod.json content
+                            var modData = ParseModJson(modJsonContent);
+                            if (modData == null)
+                            {
+                                App.LogService.Warning($"Failed to parse mod.json from archive {archiveFileName}");
+                                return null;
+                            }
+
+                            // Skip this mod if it doesn't specify a game or doesn't match the current game
+                            if (string.IsNullOrEmpty(modData.Game) ||
+                                !modData.Game.Equals(currentGameName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                App.LogService.LogDebug($"Mod in {archiveFileName} has game '{modData.Game}', expected '{currentGameName}'");
+                                return null;
+                            }
+
+                            // Get the parent directory of mod.json to determine the root path inside the archive
+                            string modRootInArchive = rootPath;
+                            if (string.IsNullOrEmpty(modRootInArchive))
+                            {
+                                modRootInArchive = Path.GetDirectoryName(modJsonEntry.Key)?.Replace('\\', '/') ?? "";
+                                if (!string.IsNullOrEmpty(modRootInArchive) && !modRootInArchive.EndsWith("/"))
+                                {
+                                    modRootInArchive += "/";
+                                }
+                            }
+
+                            App.LogService.Trace($"Mod root in archive: {modRootInArchive}");
+
+                            // Create mod info
+                            var modInfo = new ModInfo
+                            {
+                                Name = string.IsNullOrEmpty(modData.Name) ? "Unknown Mod" : modData.Name,
+                                Description = modData.Description ?? "",
+                                Version = string.IsNullOrEmpty(modData.Version) ? "N/A" : modData.Version,
+                                Author = string.IsNullOrEmpty(modData.Author) ? "Unknown" : modData.Author,
+                                Game = modData.Game,
+                                Category = modData.Category ?? "Uncategorized",
+                                IsFromArchive = true,
+                                ArchiveSource = archivePath,
+                                ArchiveRootPath = modRootInArchive
+                            };
+
+                            App.LogService.LogDebug($"Created ModInfo from archive: {modInfo.Name} v{modInfo.Version} by {modInfo.Author}");
+
+                            // Look for icon.png in the archive
+                            var iconEntry = archive.Entries.FirstOrDefault(e =>
+                                Path.GetFileName(e.Key).Equals("icon.png", StringComparison.OrdinalIgnoreCase) &&
+                                Path.GetDirectoryName(e.Key)?.Replace('\\', '/') == modRootInArchive.TrimEnd('/'));
+
+                            if (iconEntry != null)
+                            {
+                                App.LogService.Trace($"Found icon.png at {iconEntry.Key}");
+                                try
+                                {
+                                    using (var stream = iconEntry.OpenEntryStream())
+                                    {
+                                        var memoryStream = new MemoryStream();
+                                        stream.CopyTo(memoryStream);
+                                        memoryStream.Position = 0;
+
+                                        var bitmap = new BitmapImage();
+                                        bitmap.BeginInit();
+                                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                                        bitmap.StreamSource = memoryStream;
+                                        bitmap.EndInit();
+                                        bitmap.Freeze(); // Make it thread safe
+
+                                        modInfo.Icon = bitmap;
+                                        App.LogService.Trace("Icon loaded successfully");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    App.LogService.Warning($"Error loading icon from archive {archiveFileName}: {ex.Message}");
+                                    App.LogService.LogDebug($"Icon loading error details: {ex}");
+                                    modInfo.Icon = _defaultModIcon;
+                                }
+                            }
+                            else
+                            {
+                                App.LogService.Trace($"No icon.png found, using default icon");
+                                modInfo.Icon = _defaultModIcon;
+                            }
+
+                            return modInfo;
+                        }
+                    }
+                    catch (SharpCompress.Common.ArchiveException aex)
+                    {
+                        // Specialized handling for archive format errors
+                        App.LogService.Error($"Archive format error: {aex.Message}");
+                        App.LogService.LogDebug($"Archive exception details: {aex}");
+                        return null;
+                    }
+                    catch (Exception ex)
+                    {
+                        App.LogService.Error($"Error reading mod from archive {archiveFileName}: {ex.Message}");
+                        App.LogService.LogDebug($"Exception details: {ex}");
+                        return null;
+                    }
+                });
+            }, $"Loading mod from archive: {Path.GetFileName(archivePath)}", false);
         }
 
         // Scan for mods for a specific game
         public async Task<List<ModInfo>> ScanForModsAsync(GameInfo game)
         {
-            var mods = new List<ModInfo>();
-            if (game == null) return mods;
-
-            return await Task.Run(async () =>
+            return await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                try
+                var mods = new List<ModInfo>();
+                if (game == null)
                 {
-                    string gameModsFolder = GetGameModsFolder(game);
-                    if (string.IsNullOrEmpty(gameModsFolder) || !Directory.Exists(gameModsFolder))
-                    {
-                        return mods;
-                    }
-
-                    System.Diagnostics.Debug.WriteLine($"Scanning for mods in {gameModsFolder}");
-
-                    // Process all subdirectories (each could be a mod)
-                    foreach (var modFolder in Directory.GetDirectories(gameModsFolder))
-                    {
-                        try
-                        {
-                            var mod = LoadModFromFolderPath(modFolder, game.Name);
-                            if (mod != null)
-                            {
-                                mods.Add(mod);
-                                System.Diagnostics.Debug.WriteLine($"Found mod: {mod.Name} by {mod.Author}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            // Log error and continue with next mod
-                            System.Diagnostics.Debug.WriteLine($"Error loading mod from {modFolder}: {ex.Message}");
-                        }
-                    }
-
-                    // Process archive files without extracting
-                    await ProcessArchivesAsync(gameModsFolder, game.Name, mods);
-
-                    System.Diagnostics.Debug.WriteLine($"Found {mods.Count} mods for game {game.Name}");
+                    App.LogService.Warning("ScanForModsAsync called with null game");
                     return mods;
                 }
-                catch (Exception ex)
+
+                // Start performance tracking
+                var startTime = DateTime.Now;
+                App.LogService.Info($"Starting mod scan for game: {game.Name}");
+
+                string gameModsFolder = GetGameModsFolder(game);
+                if (string.IsNullOrEmpty(gameModsFolder) || !Directory.Exists(gameModsFolder))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error scanning for mods: {ex.Message}");
+                    App.LogService.Warning($"Mods folder not found for game: {game.Name}");
                     return mods;
                 }
-            });
+
+                App.LogService.LogDebug($"Scanning for mods in {gameModsFolder}");
+
+                // Process all subdirectories (each could be a mod)
+                var folderScanStopwatch = new System.Diagnostics.Stopwatch();
+                folderScanStopwatch.Start();
+
+                var modFolders = Directory.GetDirectories(gameModsFolder);
+                App.LogService.LogDebug($"Found {modFolders.Length} potential mod folders");
+
+                int foldersProcessed = 0;
+                int foldersSuccessful = 0;
+
+                foreach (var modFolder in modFolders)
+                {
+                    foldersProcessed++;
+                    string folderName = Path.GetFileName(modFolder);
+                    App.LogService.Trace($"Processing folder ({foldersProcessed}/{modFolders.Length}): {folderName}");
+
+                    try
+                    {
+                        var mod = LoadModFromFolderPath(modFolder, game.Name);
+                        if (mod != null)
+                        {
+                            mods.Add(mod);
+                            foldersSuccessful++;
+                            App.LogService.LogDebug($"Successfully loaded mod from folder: {mod.Name} by {mod.Author}");
+                        }
+                        else
+                        {
+                            App.LogService.LogDebug($"No valid mod found in folder: {folderName}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log error and continue with next mod
+                        App.LogService.Error($"Error loading mod from {folderName}: {ex.Message}");
+                        App.LogService.LogDebug($"Exception details: {ex}");
+                    }
+                }
+
+                folderScanStopwatch.Stop();
+                App.LogService.LogDebug($"Folder scan completed in {folderScanStopwatch.ElapsedMilliseconds}ms: {foldersSuccessful} of {modFolders.Length} folders contained valid mods");
+
+                // Process archive files without extracting
+                var archiveScanStopwatch = new System.Diagnostics.Stopwatch();
+                archiveScanStopwatch.Start();
+
+                await ProcessArchivesAsync(gameModsFolder, game.Name, mods);
+
+                archiveScanStopwatch.Stop();
+                App.LogService.LogDebug($"Archive scan completed in {archiveScanStopwatch.ElapsedMilliseconds}ms");
+
+                // Calculate total elapsed time
+                var elapsed = DateTime.Now - startTime;
+                App.LogService.Info($"Mod scan complete for {game.Name}: Found {mods.Count} mods in {elapsed.TotalMilliseconds:F1}ms");
+
+                // Performance warning if scan takes too long
+                if (elapsed.TotalSeconds > 5)
+                {
+                    App.LogService.Warning($"Mod scanning took longer than expected ({elapsed.TotalSeconds:F1} seconds). Consider optimizing the mod directory.");
+                }
+
+                return mods;
+            }, $"Scanning for mods: {game?.Name ?? "unknown game"}", true, new List<ModInfo>());
         }
 
         // Load a mod from a folder (accessible publicly)
         public ModInfo LoadModFromFolderPath(string folderPath, string currentGameName)
         {
-            // Check for mod.json file
-            string modJsonPath = Path.Combine(folderPath, "mod.json");
-            if (!File.Exists(modJsonPath))
+            return ErrorHandler.ExecuteSafe<ModInfo>(() =>
             {
-                System.Diagnostics.Debug.WriteLine($"No mod.json found in {folderPath}");
-                return null;
-            }
-
-            try
-            {
-                // Parse mod.json
-                string jsonContent = File.ReadAllText(modJsonPath);
-                var modData = ParseModJson(jsonContent); // Use the new method
-
-                // Skip this mod if it doesn't specify a game or doesn't match the current game
-                if (string.IsNullOrEmpty(modData.Game) ||
-                    !modData.Game.Equals(currentGameName, StringComparison.OrdinalIgnoreCase))
+                // Validate inputs
+                if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Mod in {folderPath} has no game specified or doesn't match current game");
+                    App.LogService.Warning($"LoadModFromFolderPath called with invalid folder: {folderPath}");
                     return null;
                 }
 
-                // Create mod info
-                var modInfo = new ModInfo
+                if (string.IsNullOrEmpty(currentGameName))
                 {
-                    Name = string.IsNullOrEmpty(modData.Name) ? "Unknown Mod" : modData.Name,
-                    Description = modData.Description ?? "",
-                    Version = string.IsNullOrEmpty(modData.Version) ? "N/A" : modData.Version,
-                    Author = string.IsNullOrEmpty(modData.Author) ? "Unknown" : modData.Author,
-                    Game = modData.Game,
-                    Category = modData.Category ?? "Uncategorized", // Handle the category
-                    ModFolderPath = folderPath,
-                    ModFilesPath = Path.Combine(folderPath, "Mod"),
-                    IsFromArchive = false
-                };
-
-                // Load icon if exists
-                string iconPath = Path.Combine(folderPath, "icon.png");
-                if (File.Exists(iconPath))
-                {
-                    modInfo.Icon = LoadIconFromFile(iconPath);
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"No icon.png found for mod in {folderPath}, using default");
-                    modInfo.Icon = _defaultModIcon;
+                    App.LogService.Warning("LoadModFromFolderPath called with empty game name");
+                    return null;
                 }
 
-                return modInfo;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error parsing mod.json from {folderPath}: {ex.Message}");
-                return null;
-            }
+                string folderName = Path.GetFileName(folderPath);
+                App.LogService.LogDebug($"Loading mod from folder: {folderName}");
+
+                // Check for mod.json file
+                string modJsonPath = Path.Combine(folderPath, "mod.json");
+                if (!File.Exists(modJsonPath))
+                {
+                    App.LogService.LogDebug($"No mod.json found in {folderName}");
+                    return null;
+                }
+
+                try
+                {
+                    // Parse mod.json
+                    string jsonContent = File.ReadAllText(modJsonPath);
+                    App.LogService.Trace("Read mod.json content");
+
+                    var modData = ParseModJson(jsonContent);
+                    if (modData == null)
+                    {
+                        App.LogService.Warning($"Failed to parse mod.json from folder {folderName}");
+                        return null;
+                    }
+
+                    // Skip this mod if it doesn't specify a game or doesn't match the current game
+                    if (string.IsNullOrEmpty(modData.Game) ||
+                        !modData.Game.Equals(currentGameName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        App.LogService.LogDebug($"Mod in {folderName} has game '{modData.Game}', expected '{currentGameName}'");
+                        return null;
+                    }
+
+                    // Create mod info
+                    var modInfo = new ModInfo
+                    {
+                        Name = string.IsNullOrEmpty(modData.Name) ? "Unknown Mod" : modData.Name,
+                        Description = modData.Description ?? "",
+                        Version = string.IsNullOrEmpty(modData.Version) ? "N/A" : modData.Version,
+                        Author = string.IsNullOrEmpty(modData.Author) ? "Unknown" : modData.Author,
+                        Game = modData.Game,
+                        Category = modData.Category ?? "Uncategorized",
+                        ModFolderPath = folderPath,
+                        ModFilesPath = Path.Combine(folderPath, "Mod"),
+                        IsFromArchive = false
+                    };
+
+                    App.LogService.LogDebug($"Created ModInfo from folder: {modInfo.Name} v{modInfo.Version} by {modInfo.Author}");
+
+                    // Load icon if exists
+                    string iconPath = Path.Combine(folderPath, "icon.png");
+                    if (File.Exists(iconPath))
+                    {
+                        App.LogService.Trace($"Found icon.png at {iconPath}");
+                        modInfo.Icon = LoadIconFromFile(iconPath);
+                    }
+                    else
+                    {
+                        App.LogService.Trace("No icon.png found, using default icon");
+                        modInfo.Icon = _defaultModIcon;
+                    }
+
+                    return modInfo;
+                }
+                catch (Exception ex)
+                {
+                    App.LogService.Error($"Error parsing mod.json from {folderName}: {ex.Message}");
+                    App.LogService.LogDebug($"Exception details: {ex}");
+                    return null;
+                }
+            }, $"Loading mod from folder: {Path.GetFileName(folderPath)}", false);
         }
 
         // Load icon from file
         private BitmapImage LoadIconFromFile(string iconPath)
         {
-            try
+            return ErrorHandler.ExecuteSafe<BitmapImage>(() =>
             {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.UriSource = new Uri(iconPath);
-                bitmap.EndInit();
-                bitmap.Freeze(); // Make it thread safe
-                return bitmap;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading icon from {iconPath}: {ex.Message}");
-                return _defaultModIcon;
-            }
-        }
+                if (string.IsNullOrEmpty(iconPath) || !File.Exists(iconPath))
+                {
+                    App.LogService.Warning($"LoadIconFromFile called with invalid path: {iconPath}");
+                    return _defaultModIcon;
+                }
 
-        // Load default mod icon (question mark icon)
-        private BitmapImage LoadDefaultModIcon()
-        {
-            try
-            {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.UriSource = new Uri("pack://application:,,,/AMO_Launcher;component/Resources/DefaultModIcon.png");
-                bitmap.EndInit();
-                bitmap.Freeze(); // Make it thread safe
-                return bitmap;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading default mod icon: {ex.Message}");
-                return null;
-            }
+                App.LogService.Trace($"Loading icon from {iconPath}");
+
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.UriSource = new Uri(iconPath);
+                    bitmap.EndInit();
+                    bitmap.Freeze(); // Make it thread safe
+                    App.LogService.Trace("Icon loaded successfully");
+                    return bitmap;
+                }
+                catch (Exception ex)
+                {
+                    App.LogService.Warning($"Error loading icon from {iconPath}: {ex.Message}");
+                    App.LogService.LogDebug($"Icon loading error details: {ex}");
+                    return _defaultModIcon;
+                }
+            }, $"Loading icon: {Path.GetFileName(iconPath)}", false, _defaultModIcon);
         }
 
         private ModData ParseModJson(string jsonContent)
         {
-            try
+            return ErrorHandler.ExecuteSafe<ModData>(() =>
             {
-                return JsonConvert.DeserializeObject<ModData>(jsonContent);
-            }
-            catch (JsonReaderException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"JSON parsing error: {ex.Message} - Attempting to clean the JSON");
+                if (string.IsNullOrEmpty(jsonContent))
+                {
+                    App.LogService.Warning("ParseModJson called with empty content");
+                    return null;
+                }
 
-                // 1. Handle BOM and encoding issues by normalizing line endings
-                jsonContent = jsonContent.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
-
-                // 2. Handle trailing commas
-                string cleanedJson = System.Text.RegularExpressions.Regex.Replace(
-                    jsonContent,
-                    @",\s*([}\]])",
-                    "$1"
-                );
-
-                // 3. Remove any non-printable characters
-                cleanedJson = System.Text.RegularExpressions.Regex.Replace(
-                    cleanedJson,
-                    @"[\u0000-\u001F\u007F-\u009F]",
-                    string.Empty
-                );
+                App.LogService.Trace("Parsing mod.json content");
 
                 try
                 {
-                    return JsonConvert.DeserializeObject<ModData>(cleanedJson);
+                    return JsonConvert.DeserializeObject<ModData>(jsonContent);
                 }
-                catch (JsonReaderException innerEx)
+                catch (JsonReaderException ex)
                 {
-                    // 4. If all else fails, try a more aggressive approach - rewrite the entire JSON manually
+                    App.LogService.Warning($"JSON parsing error: {ex.Message}");
+                    App.LogService.LogDebug("Attempting to clean the JSON");
+
+                    // 1. Handle BOM and encoding issues by normalizing line endings
+                    jsonContent = jsonContent.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
+                    App.LogService.Trace("Normalized line endings");
+
+                    // 2. Handle trailing commas
+                    string cleanedJson = System.Text.RegularExpressions.Regex.Replace(
+                        jsonContent,
+                        @",\s*([}\]])",
+                        "$1"
+                    );
+                    App.LogService.Trace("Removed trailing commas");
+
+                    // 3. Remove any non-printable characters
+                    cleanedJson = System.Text.RegularExpressions.Regex.Replace(
+                        cleanedJson,
+                        @"[\u0000-\u001F\u007F-\u009F]",
+                        string.Empty
+                    );
+                    App.LogService.Trace("Removed non-printable characters");
+
                     try
                     {
-                        System.Diagnostics.Debug.WriteLine($"First cleanup failed: {innerEx.Message} - Trying manual parsing");
-
-                        // Extract values using simple regex patterns
-                        var nameMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"name\"\\s*:\\s*\"([^\"]*)\"");
-                        var descMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"description\"\\s*:\\s*\"([^\"]*)\"");
-                        var versionMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"version\"\\s*:\\s*\"([^\"]*)\"");
-                        var authorMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"author\"\\s*:\\s*\"([^\"]*)\"");
-                        var gameMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"game\"\\s*:\\s*\"([^\"]*)\"");
-                        var categoryMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"category\"\\s*:\\s*\"([^\"]*)\"");
-
-                        // Construct a clean JSON object
-                        var modData = new ModData
-                        {
-                            Name = nameMatch.Success ? nameMatch.Groups[1].Value : null,
-                            Description = descMatch.Success ? descMatch.Groups[1].Value : null,
-                            Version = versionMatch.Success ? versionMatch.Groups[1].Value : null,
-                            Author = authorMatch.Success ? authorMatch.Groups[1].Value : null,
-                            Game = gameMatch.Success ? gameMatch.Groups[1].Value : null,
-                            Category = categoryMatch.Success ? categoryMatch.Groups[1].Value : null
-                        };
-
-                        return modData;
+                        App.LogService.LogDebug("Attempting to parse cleaned JSON");
+                        return JsonConvert.DeserializeObject<ModData>(cleanedJson);
                     }
-                    catch (Exception finalEx)
+                    catch (JsonReaderException innerEx)
                     {
-                        System.Diagnostics.Debug.WriteLine($"All JSON parsing attempts failed: {finalEx.Message}");
-                        // Rethrow the original exception for better diagnostics
-                        throw ex;
+                        // 4. If all else fails, try a more aggressive approach - rewrite the entire JSON manually
+                        App.LogService.Warning($"First cleanup failed: {innerEx.Message}");
+                        App.LogService.LogDebug("Trying manual parsing with regex");
+
+                        try
+                        {
+                            // Extract values using simple regex patterns
+                            var nameMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"name\"\\s*:\\s*\"([^\"]*)\"");
+                            var descMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"description\"\\s*:\\s*\"([^\"]*)\"");
+                            var versionMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"version\"\\s*:\\s*\"([^\"]*)\"");
+                            var authorMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"author\"\\s*:\\s*\"([^\"]*)\"");
+                            var gameMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"game\"\\s*:\\s*\"([^\"]*)\"");
+                            var categoryMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"category\"\\s*:\\s*\"([^\"]*)\"");
+
+                            // Log regex match results for debugging
+                            App.LogService.Trace($"Regex matches - Name: {nameMatch.Success}, Description: {descMatch.Success}, " +
+                                $"Version: {versionMatch.Success}, Author: {authorMatch.Success}, " +
+                                $"Game: {gameMatch.Success}, Category: {categoryMatch.Success}");
+
+                            // Construct a clean JSON object
+                            var modData = new ModData
+                            {
+                                Name = nameMatch.Success ? nameMatch.Groups[1].Value : null,
+                                Description = descMatch.Success ? descMatch.Groups[1].Value : null,
+                                Version = versionMatch.Success ? versionMatch.Groups[1].Value : null,
+                                Author = authorMatch.Success ? authorMatch.Groups[1].Value : null,
+                                Game = gameMatch.Success ? gameMatch.Groups[1].Value : null,
+                                Category = categoryMatch.Success ? categoryMatch.Groups[1].Value : null
+                            };
+
+                            App.LogService.LogDebug("Manual parsing successful");
+                            return modData;
+                        }
+                        catch (Exception finalEx)
+                        {
+                            App.LogService.Error($"All JSON parsing attempts failed: {finalEx.Message}");
+                            App.LogService.LogDebug($"Final exception details: {finalEx}");
+                            // Rethrow the original exception for better diagnostics
+                            throw ex;
+                        }
                     }
                 }
-            }
+            }, "Parsing mod.json", false);
         }
 
         // Helper class for deserializing mod.json

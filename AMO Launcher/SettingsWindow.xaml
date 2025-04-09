@@ -699,7 +699,7 @@
                                FontWeight="Medium"
                                Margin="0,20,0,5"/>
 
-                    <TextBlock Text="Development: KolarF1&#10;Testing: AMO Community&#10;Logo Design: W1echuz&#10;Special Thanks: Claude AI"
+                    <TextBlock Text="Development: KolarF1&#10;Testing: AMO Community&#10;Logo Design: W1echuz&#10;"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                TextWrapping="Wrap" 
                                Margin="15,0,0,15"
