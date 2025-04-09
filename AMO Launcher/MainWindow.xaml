@@ -321,6 +321,30 @@
             <Setter Property="Foreground" Value="Black"/>
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
+
+        <ContextMenu x:Key="ModManagementContextMenu" Style="{StaticResource ModContextMenuStyle}">
+            <MenuItem Header="Delete Mod" 
+              Style="{StaticResource ModContextMenuItemStyle}"
+              Click="DeleteMod_Click">
+                <MenuItem.Icon>
+                    <iconPacks:PackIconBootstrapIcons Kind="Trash" Width="16" Height="16" Foreground="#E57B6F"/>
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Deactivate All Mods" 
+              Style="{StaticResource ModContextMenuItemStyle}"
+              Click="DeactivateAllMods_Click">
+                <MenuItem.Icon>
+                    <iconPacks:PackIconBootstrapIcons Kind="ToggleOff" Width="16" Height="16" Foreground="#E57B6F"/>
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Activate All Mods" 
+              Style="{StaticResource ModContextMenuItemStyle}"
+              Click="ActivateAllMods_Click">
+                <MenuItem.Icon>
+                    <iconPacks:PackIconBootstrapIcons Kind="ToggleOn" Width="16" Height="16" Foreground="#1E9525"/>
+                </MenuItem.Icon>
+            </MenuItem>
+        </ContextMenu>
     </Window.Resources>
 
     <Window.Background>
@@ -445,7 +469,8 @@
                                 <TreeView x:Name="AvailableModsTreeView" 
                                  Background="Transparent" 
                                  BorderThickness="0"
-                                 Visibility="Visible">
+                                 Visibility="Visible"
+                                 ContextMenu="{StaticResource ModManagementContextMenu}">
                                     <TreeView.Resources>
                                         <!-- Template for category headers -->
                                         <HierarchicalDataTemplate DataType="{x:Type models:ModCategory}" 
@@ -671,25 +696,8 @@
                                                          Background="Transparent" 
                                                          BorderThickness="0"
                                                          Visibility="Collapsed"
-                                                         AlternationCount="1000">
-                                                    <ListView.ContextMenu>
-                                                        <ContextMenu Style="{StaticResource ModContextMenuStyle}">
-                                                            <MenuItem Header="Delete Mod" 
-                                                                      Style="{StaticResource ModContextMenuItemStyle}"
-                                                                      Click="DeleteMod_Click">
-                                                                <MenuItem.Icon>
-                                                                    <iconPacks:PackIconBootstrapIcons Kind="Trash" Width="16" Height="16" Foreground="#E57B6F"/>
-                                                                </MenuItem.Icon>
-                                                            </MenuItem>
-                                                            <MenuItem Header="Deactivate All Mods" 
-                                                                      Style="{StaticResource ModContextMenuItemStyle}"
-                                                                      Click="DeactivateAllMods_Click">
-                                                                <MenuItem.Icon>
-                                                                    <iconPacks:PackIconBootstrapIcons Kind="ToggleOff" Width="16" Height="16" Foreground="#FF1E9525"/>
-                                                                </MenuItem.Icon>
-                                                            </MenuItem>
-                                                        </ContextMenu>
-                                                    </ListView.ContextMenu>
+                                                         AlternationCount="1000"
+                                                         ContextMenu="{StaticResource ModManagementContextMenu}">
                                                     <ListView.View>
                                                         <GridView>
                                                             <!-- Hide column headers -->

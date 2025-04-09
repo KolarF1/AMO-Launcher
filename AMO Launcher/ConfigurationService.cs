@@ -1478,7 +1478,7 @@ namespace AMO_Launcher.Services
                     ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
                     AutoDetectGamesAtStartup = true,
                     AutoCheckForUpdatesAtStartup = true,
-                    EnableDetailedLogging = true,
+                    EnableDetailedLogging = false,
                     LowUsageMode = false,
                     RememberLastSelectedGame = false, // Changed default to match new requirement
                     LauncherActionOnGameLaunch = "Minimize",
@@ -1643,7 +1643,7 @@ namespace AMO_Launcher.Services
         public Dictionary<string, string> ActiveProfileIds { get; set; } = new Dictionary<string, string>();
         public bool AutoDetectGamesAtStartup { get; set; } = true;
         public bool AutoCheckForUpdatesAtStartup { get; set; } = true;
-        public bool EnableDetailedLogging { get; set; } = true;
+        public bool EnableDetailedLogging { get; set; } = false;
         public bool LowUsageMode { get; set; } = false;
         public bool RememberLastSelectedGame { get; set; } = false; // Changed from true to false
         public List<string> CustomGameScanPaths { get; set; } = new List<string>();

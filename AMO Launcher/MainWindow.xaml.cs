@@ -1719,34 +1719,50 @@ namespace AMO_Launcher
                 var contextMenu = menuItem.Parent as ContextMenu;
                 if (contextMenu == null) return;
 
-                var treeView = contextMenu.PlacementTarget as TreeView;
-                if (treeView == null) return;
+                var targetControl = contextMenu.PlacementTarget;
+                object selectedItem = null;
 
-                var selectedItem = treeView.SelectedItem;
-                if (selectedItem == null) return;
-
-                if (selectedItem is ModInfo selectedMod)
+                // Determine which control triggered the context menu
+                if (targetControl is ListView listView)
                 {
-                    App.LogService.Info($"Deleting mod: {selectedMod.Name}");
-                    DeleteModItem(selectedMod);
-                }
-                else if (selectedItem is ModCategory category)
-                {
-                    App.LogService.Info($"Deleting category: {category.Name} with {category.Mods.Count} mods");
+                    selectedItem = listView.SelectedItem;
+                    App.LogService.LogDebug("Context menu triggered from ListView (Applied Mods)");
 
-                    var result = MessageBox.Show(
-                        $"Are you sure you want to delete ALL mods in the '{category.Name}' category?\n\nThis action cannot be undone.",
-                        "Confirm Category Deletion",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning);
-
-                    if (result != MessageBoxResult.Yes) return;
-
-                    var modsToDelete = category.Mods.ToList();
-
-                    foreach (var mod in modsToDelete)
+                    if (selectedItem is ModInfo selectedMod)
                     {
-                        DeleteModItem(mod);
+                        App.LogService.Info($"Deleting mod from applied list and system: {selectedMod.Name}");
+                        // Call DeleteModItem which handles both removing from applied list and deleting from system
+                        DeleteModItem(selectedMod);
+                    }
+                }
+                else if (targetControl is TreeView treeView)
+                {
+                    selectedItem = treeView.SelectedItem;
+                    App.LogService.LogDebug("Context menu triggered from TreeView (Available Mods)");
+
+                    if (selectedItem is ModInfo selectedMod)
+                    {
+                        App.LogService.Info($"Deleting mod: {selectedMod.Name}");
+                        DeleteModItem(selectedMod);
+                    }
+                    else if (selectedItem is ModCategory category)
+                    {
+                        App.LogService.Info($"Deleting category: {category.Name} with {category.Mods.Count} mods");
+
+                        var result = MessageBox.Show(
+                            $"Are you sure you want to delete ALL mods in the '{category.Name}' category?\n\nThis action cannot be undone.",
+                            "Confirm Category Deletion",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning);
+
+                        if (result != MessageBoxResult.Yes) return;
+
+                        var modsToDelete = category.Mods.ToList();
+
+                        foreach (var mod in modsToDelete)
+                        {
+                            DeleteModItem(mod);
+                        }
                     }
                 }
             }, "Delete mod or category");
@@ -1755,6 +1771,34 @@ namespace AMO_Launcher
         private void DeactivateAllMods_Click(object sender, RoutedEventArgs e)
         {
             ErrorHandler.ExecuteSafe(() => {
+                // Check which control triggered the context menu
+                var menuItem = sender as MenuItem;
+                if (menuItem == null) return;
+
+                var contextMenu = menuItem.Parent as ContextMenu;
+                if (contextMenu == null) return;
+
+                // For TreeView, deactivate refers to available mods, so we'll handle it differently
+                var targetControl = contextMenu.PlacementTarget;
+                if (targetControl is TreeView)
+                {
+                    App.LogService.LogDebug("DeactivateAllMods triggered from TreeView - switching to applied mods tab");
+                    // Just switch to applied mods tab if triggered from TreeView
+                    ModTabControl.SelectedItem = AppliedModsTab;
+
+                    // Inform user how to deactivate mods
+                    if (_appliedMods.Count > 0)
+                    {
+                        MessageBox.Show(
+                            "To deactivate mods, go to the Applied Mods tab and use the checkboxes or right-click menu.",
+                            "Deactivate Mods",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    return;
+                }
+
+                // Original functionality for ListView
                 if (_appliedMods.Count == 0)
                 {
                     App.LogService.Info("No applied mods to deactivate");
@@ -1791,6 +1835,47 @@ namespace AMO_Launcher
                     Mouse.OverrideCursor = null;
                 }
             }, "Deactivate all mods");
+        }
+
+        private void ActivateAllMods_Click(object sender, RoutedEventArgs e)
+        {
+            ErrorHandler.ExecuteSafe(() => {
+                if (_appliedMods.Count == 0)
+                {
+                    App.LogService.Info("No applied mods to activate");
+                    MessageBox.Show("There are no applied mods to activate.", "No Applied Mods",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var result = MessageBox.Show(
+                    "Are you sure you want to activate all mods?",
+                    "Confirm Activate All Mods",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result != MessageBoxResult.Yes) return;
+
+                App.LogService.Info($"Activating all {_appliedMods.Count} mods");
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                try
+                {
+                    foreach (var mod in _appliedMods)
+                    {
+                        mod.IsActive = true;
+                        App.LogService.LogDebug($"Activated mod: {mod.Name}");
+                    }
+
+                    _configService.MarkModsChanged();
+                    SaveAppliedMods();
+                    App.LogService.Info("All mods activated successfully");
+                }
+                finally
+                {
+                    Mouse.OverrideCursor = null;
+                }
+            }, "Activate all mods");
         }
 
         private void AppliedModsListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -4216,8 +4301,6 @@ namespace AMO_Launcher
         }
     }
 
-    // ===== Performance Tracking Helper =====
-
     public class PerformanceTracker : IDisposable
     {
         private string _operationName;
@@ -4314,8 +4397,6 @@ namespace AMO_Launcher
             }
         }
     }
-
-    // ===== Flow Tracking Helper =====
 
     public static class FlowTracker
     {
