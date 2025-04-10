@@ -37,6 +37,7 @@ namespace AMO_Launcher
         private ObservableCollection<ModInfo> _availableModsFlat;
         private ObservableCollection<ModCategory> _availableModsCategories;
         private ObservableCollection<ModInfo> _appliedMods;
+        private ObservableCollection<ModCategory> _appliedModsCategories;
 
         private GameInfo _currentGame;
 
@@ -75,9 +76,10 @@ namespace AMO_Launcher
                 _availableModsFlat = new ObservableCollection<ModInfo>();
                 _availableModsCategories = new ObservableCollection<ModCategory>();
                 _appliedMods = new ObservableCollection<ModInfo>();
+                _appliedModsCategories = new ObservableCollection<ModCategory>();
 
                 AvailableModsTreeView.ItemsSource = _availableModsCategories;
-                AppliedModsListView.ItemsSource = _appliedMods;
+                AppliedModsTreeView.ItemsSource = _appliedModsCategories;
 
                 Title = $"AMO Launcher v{GetAppVersion()}";
 
@@ -96,12 +98,21 @@ namespace AMO_Launcher
                     }
                 }
 
+                // Initialize the applied mods TreeView
+                InitializeAppliedModsTreeView();
+
                 App.LogService.LogDebug("MainWindow constructor completed successfully");
             }
             catch (Exception ex)
             {
                 LogCategorizedError("Error initializing MainWindow", ex, ErrorCategory.UI);
             }
+        }
+
+        private void InitializeAppliedModsTreeView()
+        {
+            AppliedModsTreeView.SelectedItemChanged += AppliedModsTreeView_SelectedItemChanged;
+            AppliedModsTreeView.MouseDoubleClick += AppliedModsTreeView_MouseDoubleClick;
         }
 
         private string GetAppVersion()
@@ -335,7 +346,6 @@ namespace AMO_Launcher
             // Previous events - should be kept
             AvailableModsTreeView.SelectedItemChanged += AvailableModsTreeView_SelectedItemChanged;
             AvailableModsTreeView.MouseDoubleClick += AvailableModsTreeView_MouseDoubleClick;
-            AppliedModsListView.MouseDoubleClick += AppliedModsListView_MouseDoubleClick;
         }
 
         private void AvailableModsTreeView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -410,6 +420,16 @@ namespace AMO_Launcher
                     ModPathTextBlock.Text = selectedMod.ModFolderPath ?? selectedMod.ArchiveSource;
                     ModHeaderImage.Source = selectedMod.Icon;
                 }
+            }
+        }
+
+        private void AppliedModsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            // Handle selection changed in the applied mods TreeView
+            if (e.NewValue is ModInfo selectedMod)
+            {
+                // Handle mod selection - you can add any specific logic here
+                App.LogService.LogDebug($"Selected applied mod: {selectedMod.Name}");
             }
         }
 
@@ -791,7 +811,7 @@ namespace AMO_Launcher
                         if (_currentGame == null)
                         {
                             App.LogService.LogDebug("No game selected");
-                            AppliedModsListView.Visibility = Visibility.Collapsed;
+                            AppliedModsTreeView.Visibility = Visibility.Collapsed;
                             FlowTracker.StepFlow("LoadAppliedMods", "NoGame");
                             return;
                         }
@@ -833,7 +853,7 @@ namespace AMO_Launcher
                         if (appliedModSettings == null || appliedModSettings.Count == 0)
                         {
                             App.LogService.LogDebug("No applied mods found in config service");
-                            AppliedModsListView.Visibility = Visibility.Collapsed;
+                            AppliedModsTreeView.Visibility = Visibility.Collapsed;
                             FlowTracker.StepFlow("LoadAppliedMods", "NoMods");
                             return;
                         }
@@ -898,7 +918,8 @@ namespace AMO_Launcher
                             }
                         }
 
-                        AppliedModsListView.Visibility = _appliedMods.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                        // Update the TreeView with the loaded mods
+                        UpdateAppliedModsTreeView();
 
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
@@ -926,6 +947,26 @@ namespace AMO_Launcher
                     }
                 }
             }, "Loading applied mods");
+        }
+
+        private void UpdateAppliedModsTreeView()
+        {
+            if (_appliedMods.Count == 0)
+            {
+                AppliedModsTreeView.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // Group mods by category - using the same grouping logic as available mods
+            _appliedModsCategories.Clear();
+            var categorizedMods = _appliedMods.GroupByCategory();
+
+            foreach (var category in categorizedMods)
+            {
+                _appliedModsCategories.Add(category);
+            }
+
+            AppliedModsTreeView.Visibility = Visibility.Visible;
         }
 
         private async void RefreshModsButton_Click(object sender, RoutedEventArgs e)
@@ -1004,7 +1045,7 @@ namespace AMO_Launcher
                 AvailableModsTreeView.Visibility = Visibility.Collapsed;
 
                 _appliedMods.Clear();
-                AppliedModsListView.Visibility = Visibility.Collapsed;
+                AppliedModsTreeView.Visibility = Visibility.Collapsed;
             }, "Show no game UI");
         }
 
@@ -1034,10 +1075,9 @@ namespace AMO_Launcher
                         mod.IsActive = true;
 
                         _appliedMods.Add(mod);
+                        UpdateAppliedModsTreeView();
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
-
-                        AppliedModsListView.Visibility = Visibility.Visible;
 
                         _configService.MarkModsChanged();
 
@@ -1091,10 +1131,9 @@ namespace AMO_Launcher
                         mod.IsActive = true;
 
                         _appliedMods.Add(mod);
+                        UpdateAppliedModsTreeView();
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
-
-                        AppliedModsListView.Visibility = Visibility.Visible;
 
                         _configService.MarkModsChanged();
 
@@ -1183,37 +1222,35 @@ namespace AMO_Launcher
 
                 try
                 {
-                    var selectedMods = AppliedModsListView.SelectedItems.Cast<ModInfo>().ToList();
+                    // Find selected mods in the TreeView
+                    ModInfo selectedMod = null;
+                    if (AppliedModsTreeView.SelectedItem is ModInfo mod)
+                    {
+                        selectedMod = mod;
+                    }
 
-                    if (selectedMods.Count == 0)
+                    if (selectedMod == null)
                     {
                         App.LogService.Info("No mods selected for removal");
-                        MessageBox.Show("Please select one or more mods to remove.", "No Mods Selected",
+                        MessageBox.Show("Please select a mod to remove.", "No Mods Selected",
                             MessageBoxButton.OK, MessageBoxImage.Information);
                         return;
                     }
 
-                    App.LogService.Info($"Removing {selectedMods.Count} mods from applied list");
+                    App.LogService.Info($"Removing mod from applied list: {selectedMod.Name}");
 
-                    foreach (var mod in selectedMods)
-                    {
-                        App.LogService.LogDebug($"Removing mod: {mod.Name}");
-                        mod.IsApplied = false;
-                        _appliedMods.Remove(mod);
-                    }
+                    selectedMod.IsApplied = false;
+                    _appliedMods.Remove(selectedMod);
 
                     UpdateModPriorities();
                     UpdateModPriorityDisplays();
-
-                    if (_appliedMods.Count == 0)
-                    {
-                        AppliedModsListView.Visibility = Visibility.Collapsed;
-                    }
+                    UpdateAppliedModsTreeView();
 
                     _configService.MarkModsChanged();
                     SaveAppliedMods();
+                    DetectModConflicts();
 
-                    App.LogService.Info($"Successfully removed {selectedMods.Count} mods");
+                    App.LogService.Info($"Successfully removed mod: {selectedMod.Name}");
                 }
                 finally
                 {
@@ -1225,7 +1262,16 @@ namespace AMO_Launcher
         private void MoveSelectedModToTop()
         {
             ErrorHandler.ExecuteSafe(() => {
-                if (AppliedModsListView.SelectedItem is ModInfo selectedMod)
+                // Find the selected mod
+                ModInfo selectedMod = null;
+
+                // Check if a mod is selected in the TreeView
+                if (AppliedModsTreeView.SelectedItem is ModInfo mod)
+                {
+                    selectedMod = mod;
+                }
+
+                if (selectedMod != null)
                 {
                     App.LogService.LogDebug($"Moving mod to top: {selectedMod.Name}");
 
@@ -1235,6 +1281,11 @@ namespace AMO_Launcher
                         _appliedMods.Move(currentIndex, 0);
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
+                        UpdateAppliedModsTreeView();
+
+                        // Reselect the moved item in the TreeView
+                        SelectModInTreeView(selectedMod);
+
                         _configService.MarkModsChanged();
                         SaveAppliedMods();
                         DetectModConflicts();
@@ -1248,7 +1299,16 @@ namespace AMO_Launcher
         private void MoveSelectedModUp()
         {
             ErrorHandler.ExecuteSafe(() => {
-                if (AppliedModsListView.SelectedItem is ModInfo selectedMod)
+                // Find the selected mod
+                ModInfo selectedMod = null;
+
+                // Check if a mod is selected in the TreeView
+                if (AppliedModsTreeView.SelectedItem is ModInfo mod)
+                {
+                    selectedMod = mod;
+                }
+
+                if (selectedMod != null)
                 {
                     App.LogService.LogDebug($"Moving mod up: {selectedMod.Name}");
 
@@ -1258,6 +1318,11 @@ namespace AMO_Launcher
                         _appliedMods.Move(currentIndex, currentIndex - 1);
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
+                        UpdateAppliedModsTreeView();
+
+                        // Reselect the moved item in the TreeView
+                        SelectModInTreeView(selectedMod);
+
                         _configService.MarkModsChanged();
                         SaveAppliedMods();
                         DetectModConflicts();
@@ -1271,7 +1336,16 @@ namespace AMO_Launcher
         private void MoveSelectedModDown()
         {
             ErrorHandler.ExecuteSafe(() => {
-                if (AppliedModsListView.SelectedItem is ModInfo selectedMod)
+                // Find the selected mod
+                ModInfo selectedMod = null;
+
+                // Check if a mod is selected in the TreeView
+                if (AppliedModsTreeView.SelectedItem is ModInfo mod)
+                {
+                    selectedMod = mod;
+                }
+
+                if (selectedMod != null)
                 {
                     App.LogService.LogDebug($"Moving mod down: {selectedMod.Name}");
 
@@ -1281,6 +1355,11 @@ namespace AMO_Launcher
                         _appliedMods.Move(currentIndex, currentIndex + 1);
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
+                        UpdateAppliedModsTreeView();
+
+                        // Reselect the moved item in the TreeView
+                        SelectModInTreeView(selectedMod);
+
                         _configService.MarkModsChanged();
                         SaveAppliedMods();
                         DetectModConflicts();
@@ -1294,24 +1373,111 @@ namespace AMO_Launcher
         private void MoveSelectedModToBottom()
         {
             ErrorHandler.ExecuteSafe(() => {
-                if (AppliedModsListView.SelectedItem is ModInfo selectedMod)
+                // Find the selected mod
+                ModInfo selectedMod = null;
+
+                // Check if a mod is selected in the TreeView
+                if (AppliedModsTreeView.SelectedItem is ModInfo mod)
+                {
+                    selectedMod = mod;
+                }
+
+                if (selectedMod != null)
                 {
                     App.LogService.LogDebug($"Moving mod to bottom: {selectedMod.Name}");
 
                     int currentIndex = _appliedMods.IndexOf(selectedMod);
-                    if (currentIndex < _appliedMods.Count - 1)
+                    int lastIndex = _appliedMods.Count - 1;
+
+                    if (currentIndex < lastIndex)
                     {
-                        _appliedMods.Move(currentIndex, _appliedMods.Count - 1);
+                        _appliedMods.Move(currentIndex, lastIndex);
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
+                        UpdateAppliedModsTreeView();
+
+                        // Reselect the moved item in the TreeView
+                        SelectModInTreeView(selectedMod);
+
                         _configService.MarkModsChanged();
                         SaveAppliedMods();
                         DetectModConflicts();
 
-                        App.LogService.LogDebug($"Moved mod '{selectedMod.Name}' from position {currentIndex} to {_appliedMods.Count - 1}");
+                        App.LogService.LogDebug($"Moved mod '{selectedMod.Name}' from position {currentIndex} to {lastIndex}");
                     }
                 }
             }, "Move mod to bottom");
+        }
+
+        // Helper method to select a mod in the TreeView
+        private void SelectModInTreeView(ModInfo modToSelect)
+        {
+            foreach (var category in _appliedModsCategories)
+            {
+                foreach (var mod in category.Mods)
+                {
+                    if (mod == modToSelect)
+                    {
+                        // Expand the category
+                        var categoryContainer = GetTreeViewItem(AppliedModsTreeView, category);
+                        if (categoryContainer != null)
+                        {
+                            categoryContainer.IsExpanded = true;
+                        }
+
+                        // Select the mod
+                        var modContainer = GetTreeViewItemRecursive(AppliedModsTreeView, mod);
+                        if (modContainer != null)
+                        {
+                            modContainer.IsSelected = true;
+                        }
+
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Helper method to find a TreeViewItem by its data context
+        private TreeViewItem GetTreeViewItem(ItemsControl container, object item)
+        {
+            if (container == null) return null;
+
+            if (container.ItemContainerGenerator.ContainerFromItem(item) is TreeViewItem tvi)
+            {
+                return tvi;
+            }
+
+            return null;
+        }
+
+        // Helper method to find a TreeViewItem recursively
+        private TreeViewItem GetTreeViewItemRecursive(ItemsControl container, object item)
+        {
+            if (container == null) return null;
+
+            // Try to find the item at this level
+            if (container.ItemContainerGenerator.ContainerFromItem(item) is TreeViewItem tvi)
+            {
+                return tvi;
+            }
+
+            // Search through all items at this level
+            for (int i = 0; i < container.Items.Count; i++)
+            {
+                TreeViewItem childContainer = container.ItemContainerGenerator.ContainerFromIndex(i) as TreeViewItem;
+                if (childContainer != null)
+                {
+                    // Search in this container's children
+                    TreeViewItem result = GetTreeViewItemRecursive(childContainer, item);
+                    if (result != null)
+                    {
+                        return result;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private async Task SaveAppliedModsAsync()
@@ -1650,7 +1816,8 @@ namespace AMO_Launcher
                 {
                     _appliedMods[i].Priority = count - i;
                 }
-                AppliedModsListView.Items.Refresh();
+                // Don't need to refresh the ItemsSource as we're using TreeView
+                UpdateAppliedModsTreeView();
                 App.LogService.LogDebug($"Updated priorities for {count} mods");
             }, "Update mod priorities");
         }
@@ -1855,22 +2022,10 @@ namespace AMO_Launcher
                 object selectedItem = null;
 
                 // Determine which control triggered the context menu
-                if (targetControl is ListView listView)
-                {
-                    selectedItem = listView.SelectedItem;
-                    App.LogService.LogDebug("Context menu triggered from ListView (Applied Mods)");
-
-                    if (selectedItem is ModInfo selectedMod)
-                    {
-                        App.LogService.Info($"Deleting mod from applied list and system: {selectedMod.Name}");
-                        // Call DeleteModItem which handles both removing from applied list and deleting from system
-                        DeleteModItem(selectedMod);
-                    }
-                }
-                else if (targetControl is TreeView treeView)
+                if (targetControl is TreeView treeView)
                 {
                     selectedItem = treeView.SelectedItem;
-                    App.LogService.LogDebug("Context menu triggered from TreeView (Available Mods)");
+                    App.LogService.LogDebug("Context menu triggered from TreeView");
 
                     if (selectedItem is ModInfo selectedMod)
                     {
@@ -1912,25 +2067,28 @@ namespace AMO_Launcher
 
                 // For TreeView, deactivate refers to available mods, so we'll handle it differently
                 var targetControl = contextMenu.PlacementTarget;
-                if (targetControl is TreeView)
+                if (targetControl is TreeView treeView)
                 {
-                    App.LogService.LogDebug("DeactivateAllMods triggered from TreeView - switching to applied mods tab");
-                    // Just switch to applied mods tab if triggered from TreeView
-                    ModTabControl.SelectedItem = AppliedModsTab;
-
-                    // Inform user how to deactivate mods
-                    if (_appliedMods.Count > 0)
+                    if (treeView != AppliedModsTreeView)
                     {
-                        MessageBox.Show(
-                            "To deactivate mods, go to the Applied Mods tab and use the checkboxes or right-click menu.",
-                            "Deactivate Mods",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
+                        App.LogService.LogDebug("DeactivateAllMods triggered from AvailableModsTreeView - switching to applied mods tab");
+                        // Just switch to applied mods tab if triggered from available mods TreeView
+                        ModTabControl.SelectedItem = AppliedModsTab;
+
+                        // Inform user how to deactivate mods
+                        if (_appliedMods.Count > 0)
+                        {
+                            MessageBox.Show(
+                                "To deactivate mods, go to the Applied Mods tab and use the checkboxes or right-click menu.",
+                                "Deactivate Mods",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information);
+                        }
+                        return;
                     }
-                    return;
                 }
 
-                // Original functionality for ListView
+                // Original functionality for TreeView
                 if (_appliedMods.Count == 0)
                 {
                     App.LogService.Info("No applied mods to deactivate");
@@ -1960,6 +2118,8 @@ namespace AMO_Launcher
 
                     _configService.MarkModsChanged();
                     SaveAppliedMods();
+                    // Refresh the TreeView
+                    UpdateAppliedModsTreeView();
                     App.LogService.Info("All mods deactivated successfully");
                 }
                 finally
@@ -2001,6 +2161,8 @@ namespace AMO_Launcher
 
                     _configService.MarkModsChanged();
                     SaveAppliedMods();
+                    // Refresh the TreeView
+                    UpdateAppliedModsTreeView();
                     App.LogService.Info("All mods activated successfully");
                 }
                 finally
@@ -2010,37 +2172,34 @@ namespace AMO_Launcher
             }, "Activate all mods");
         }
 
-        private void AppliedModsListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+
+        private void AppliedModsTreeView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             ErrorHandler.ExecuteSafe(() => {
                 DependencyObject originalSource = (DependencyObject)e.OriginalSource;
-                while (originalSource != null && !(originalSource is ListViewItem))
+                while (originalSource != null && !(originalSource is TreeViewItem))
                 {
                     originalSource = VisualTreeHelper.GetParent(originalSource);
                 }
 
-                if (originalSource is ListViewItem)
+                if (originalSource is TreeViewItem treeViewItem)
                 {
-                    if (AppliedModsListView.SelectedItem is ModInfo selectedMod)
+                    if (treeViewItem.DataContext is ModInfo selectedMod)
                     {
                         App.LogService.Info($"Removing mod via double-click: {selectedMod.Name}");
 
                         selectedMod.IsApplied = false;
                         _appliedMods.Remove(selectedMod);
+
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
-
-                        if (_appliedMods.Count == 0)
-                        {
-                            AppliedModsListView.Visibility = Visibility.Collapsed;
-                        }
+                        UpdateAppliedModsTreeView();
 
                         _configService.MarkModsChanged();
-
                         SaveAppliedMods();
                     }
                 }
-            }, "Applied mods list double-click");
+            }, "Applied mods tree double-click");
         }
 
         private List<ModFileConflict> _modConflicts = new List<ModFileConflict>();
@@ -2210,46 +2369,46 @@ namespace AMO_Launcher
         private List<string> GetFilesFromArchive(string archivePath, string rootPath)
         {
             return ErrorHandler.ExecuteSafe(() => {
-                var files = new List<string>();
+            var files = new List<string>();
 
-                if (!File.Exists(archivePath))
+            if (!File.Exists(archivePath))
+            {
+                App.LogService.Warning($"Archive file not found: {archivePath}");
+                return files;
+            }
+
+            try
+            {
+                App.LogService.LogDebug($"Reading files from archive: {archivePath}");
+
+                using (var archive = SharpCompress.Archives.ArchiveFactory.Open(archivePath))
                 {
-                    App.LogService.Warning($"Archive file not found: {archivePath}");
-                    return files;
-                }
-
-                try
-                {
-                    App.LogService.LogDebug($"Reading files from archive: {archivePath}");
-
-                    using (var archive = SharpCompress.Archives.ArchiveFactory.Open(archivePath))
+                    string modPath = rootPath;
+                    if (!string.IsNullOrEmpty(modPath))
                     {
-                        string modPath = rootPath;
-                        if (!string.IsNullOrEmpty(modPath))
-                        {
-                            modPath = Path.Combine(modPath, "Mod");
-                            modPath = modPath.Replace('\\', '/');
-                        }
-                        else
-                        {
-                            modPath = "Mod";
-                        }
-
-                        foreach (var entry in archive.Entries)
-                        {
-                            if (entry.IsDirectory) continue;
-
-                            string entryKey = entry.Key.Replace('\\', '/');
-                            if (entryKey.StartsWith(modPath + "/", StringComparison.OrdinalIgnoreCase))
-                            {
-                                string relativePath = entryKey.Substring(modPath.Length + 1);
-                                files.Add(relativePath);
-                            }
-                        }
-
-                        App.LogService.LogDebug($"Found {files.Count} files in archive");
+                        modPath = Path.Combine(modPath, "Mod");
+                        modPath = modPath.Replace('\\', '/');
                     }
+                    else
+                    {
+                        modPath = "Mod";
+                    }
+
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.IsDirectory) continue;
+
+                        string entryKey = entry.Key.Replace('\\', '/');
+                        if (entryKey.StartsWith(modPath + "/", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string relativePath = entryKey.Substring(modPath.Length + 1);
+                            files.Add(relativePath);
+                        }
+                    }
+
+                    App.LogService.LogDebug($"Found {files.Count} files in archive");
                 }
+            }
                 catch (Exception ex)
                 {
                     LogCategorizedError($"Error reading archive {archivePath}", ex, ErrorCategory.FileSystem);
@@ -2394,12 +2553,8 @@ namespace AMO_Launcher
 
                 ModTabControl.SelectedItem = AppliedModsTab;
 
-                var modInList = _appliedMods.FirstOrDefault(m => m == selectedItem.Mod);
-                if (modInList != null)
-                {
-                    AppliedModsListView.SelectedItem = modInList;
-                    AppliedModsListView.ScrollIntoView(modInList);
-                }
+                // Find and select the mod in the TreeView instead of ListView
+                SelectModInTreeView(selectedItem.Mod);
             }, "Jump to mod from conflicts");
         }
 
@@ -2472,6 +2627,7 @@ namespace AMO_Launcher
 
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
+                        UpdateAppliedModsTreeView();
                     }
 
                     FlowTracker.StepFlow("DeleteMod", "RemoveFromList");
@@ -2877,9 +3033,7 @@ namespace AMO_Launcher
                             ProfileComboBox.SelectionChanged += ProfileComboBox_SelectionChanged;
 
                             _appliedMods.Clear();
-                            AppliedModsListView.Visibility = Visibility.Collapsed;
-
-                            AppliedModsListView.Items.Refresh();
+                            UpdateAppliedModsTreeView();
 
                             MessageBox.Show($"Profile '{newProfile.Name}' created successfully.", "Profile Created",
                                 MessageBoxButton.OK, MessageBoxImage.Information);
@@ -3263,7 +3417,7 @@ namespace AMO_Launcher
                         if (profile == null)
                         {
                             App.LogService.Warning("Profile is null");
-                            AppliedModsListView.Visibility = Visibility.Collapsed;
+                            AppliedModsTreeView.Visibility = Visibility.Collapsed;
                             FlowTracker.StepFlow("LoadProfileMods", "NullProfile");
                             return;
                         }
@@ -3277,7 +3431,7 @@ namespace AMO_Launcher
                         if (profile.AppliedMods.Count == 0)
                         {
                             App.LogService.LogDebug("No mods in profile");
-                            AppliedModsListView.Visibility = Visibility.Collapsed;
+                            AppliedModsTreeView.Visibility = Visibility.Collapsed;
                             FlowTracker.StepFlow("LoadProfileMods", "EmptyProfile");
                             return;
                         }
@@ -3452,10 +3606,8 @@ namespace AMO_Launcher
 
                         FlowTracker.StepFlow("LoadProfileMods", "UpdateUI");
 
-                        Dispatcher.Invoke(() => {
-                            AppliedModsListView.Visibility = _appliedMods.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-                            AppliedModsListView.Items.Refresh();
-                        });
+                        // Update the TreeView with the loaded mods
+                        UpdateAppliedModsTreeView();
 
                         UpdateModPriorities();
                         UpdateModPriorityDisplays();
@@ -4768,6 +4920,35 @@ namespace AMO_Launcher
         public static void StepFlow(string flowName, string stepName)
         {
             App.LogService.LogDebug($"[FLOW:{flowName}] STEP: {stepName}");
+        }
+    }
+
+    public static class ModExtensions
+    {
+        public static ObservableCollection<ModCategory> GroupByCategory(this IEnumerable<ModInfo> mods)
+        {
+            var categories = new ObservableCollection<ModCategory>();
+            var categoryDict = new Dictionary<string, ModCategory>();
+
+            foreach (var mod in mods)
+            {
+                string categoryName = string.IsNullOrEmpty(mod.Category) ? "General" : mod.Category;
+
+                if (!categoryDict.TryGetValue(categoryName, out var category))
+                {
+                    category = new ModCategory { Name = categoryName, Mods = new ObservableCollection<ModInfo>() };
+                    categoryDict[categoryName] = category;
+                    categories.Add(category);
+                }
+
+                category.Mods.Add(mod);
+            }
+
+            // Sort categories alphabetically with "General" first
+            return new ObservableCollection<ModCategory>(
+                categories.OrderBy(c => c.Name == "General" ? 0 : 1)
+                         .ThenBy(c => c.Name)
+            );
         }
     }
 }

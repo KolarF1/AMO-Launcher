@@ -684,90 +684,183 @@
                                                            Foreground="{StaticResource TextSecondaryBrush}"
                                                            FontStyle="Italic"
                                                            Margin="0,-13,306,43" FontSize="10.5" HorizontalAlignment="Left"/>
-                                                <!-- ListView for Applied Mods -->
-                                                <ListView x:Name="AppliedModsListView" 
-                                                         Background="Transparent" 
-                                                         BorderThickness="0"
-                                                         Visibility="Collapsed"
-                                                         AlternationCount="1000"
-                                                         ContextMenu="{StaticResource ModManagementContextMenu}">
-                                                    <ListView.View>
-                                                        <GridView>
-                                                            <!-- Hide column headers -->
-                                                            <GridView.ColumnHeaderContainerStyle>
-                                                                <Style TargetType="{x:Type GridViewColumnHeader}">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                </Style>
-                                                            </GridView.ColumnHeaderContainerStyle>
+                                                <!-- TreeView for Applied Mods -->
+                                                <TreeView x:Name="AppliedModsTreeView" 
+         Background="Transparent" 
+         BorderThickness="0"
+         Visibility="Collapsed"
+         ContextMenu="{StaticResource ModManagementContextMenu}">
+                                                    <TreeView.Resources>
+                                                        <!-- Template for category headers -->
+                                                        <HierarchicalDataTemplate DataType="{x:Type models:ModCategory}" 
+                               ItemsSource="{Binding Mods}">
+                                                            <TextBlock Text="{Binding Name}" 
+                      FontWeight="Bold" 
+                      Foreground="{StaticResource TextBrush}"
+                      Margin="0,5,0,5"/>
+                                                        </HierarchicalDataTemplate>
 
-                                                            <!-- Active Checkbox -->
-                                                            <GridViewColumn Width="50">
-                                                                <GridViewColumn.CellTemplate>
-                                                                    <DataTemplate>
-                                                                        <CheckBox IsChecked="{Binding IsActive, Mode=TwoWay}" 
-                                                                                 VerticalAlignment="Center"
-                                                                                 HorizontalAlignment="Center"
-                                                                                 Checked="ActiveCheckBox_CheckChanged"
-                                                                                 Unchecked="ActiveCheckBox_CheckChanged"/>
-                                                                    </DataTemplate>
-                                                                </GridViewColumn.CellTemplate>
-                                                            </GridViewColumn>
+                                                        <!-- Template for mod items -->
+                                                        <DataTemplate DataType="{x:Type models:ModInfo}">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
 
-                                                            <!-- Mod Name with Icon -->
-                                                            <GridViewColumn Width="350">
-                                                                <GridViewColumn.CellTemplate>
-                                                                    <DataTemplate>
+                                                                <!-- Checkbox -->
+                                                                <CheckBox Grid.Column="0" 
+                         IsChecked="{Binding IsActive, Mode=TwoWay}" 
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Center"
+                         Margin="5,0,5,0"
+                         Checked="ActiveCheckBox_CheckChanged"
+                         Unchecked="ActiveCheckBox_CheckChanged"/>
+
+                                                                <!-- Mod Icon and Info -->
+                                                                <Grid Grid.Column="1">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
+
+                                                                    <!-- Mod Icon -->
+                                                                    <Border Width="32" Height="32" 
+                           Background="{StaticResource PrimaryBrush}"
+                           BorderBrush="#333333" BorderThickness="1" 
+                           CornerRadius="2" Margin="2">
+                                                                        <Image Source="{Binding Icon}" Width="24" Height="24"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               RenderOptions.EdgeMode="Aliased"/>
+                                                                    </Border>
+
+                                                                    <!-- Mod Name and Author -->
+                                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                                        <TextBlock Text="{Binding Name}" 
+                                  FontWeight="SemiBold" 
+                                  Foreground="{StaticResource TextBrush}"/>
+                                                                        <TextBlock Text="{Binding AuthorDisplay}" 
+                                  FontSize="11" 
+                                  Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                                    </StackPanel>
+                                                                </Grid>
+
+                                                                <!-- Priority Number -->
+                                                                <Border Grid.Column="2" 
+                       Background="{StaticResource AMOGoldGradient}" 
+                       Width="24" Height="24" 
+                       CornerRadius="4"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Margin="5,0,5,0">
+                                                                    <TextBlock Text="{Binding PriorityDisplay}" 
+                              FontWeight="Bold" 
+                              Foreground="Black"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center" 
+                              FontSize="14"/>
+                                                                </Border>
+                                                            </Grid>
+                                                        </DataTemplate>
+
+                                                        <!-- TreeViewItem Toggle Button Template -->
+                                                        <ControlTemplate x:Key="TreeViewItemToggleButton" TargetType="{x:Type ToggleButton}">
+                                                            <Border Width="19" Height="19" Background="Transparent">
+                                                                <Path x:Name="ExpandPath" 
+                     Stroke="{StaticResource TextBrush}" 
+                     StrokeThickness="1.5"
+                     Data="M 4,0 L 8,4 L 4,8 Z" 
+                     HorizontalAlignment="Center" 
+                     VerticalAlignment="Center" 
+                     RenderTransformOrigin="0.5,0.5">
+                                                                    <Path.RenderTransform>
+                                                                        <RotateTransform x:Name="ExpandPathRotateTransform"/>
+                                                                    </Path.RenderTransform>
+                                                                </Path>
+                                                            </Border>
+
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsChecked" Value="True">
+                                                                    <Setter Property="RenderTransform" TargetName="ExpandPath">
+                                                                        <Setter.Value>
+                                                                            <RotateTransform Angle="90"/>
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                </Trigger>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Stroke" TargetName="ExpandPath" Value="{StaticResource AccentBrush}"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+
+                                                        <!-- Style for TreeViewItems -->
+                                                        <Style TargetType="{x:Type TreeViewItem}">
+                                                            <Setter Property="IsExpanded" Value="True"/>
+                                                            <Setter Property="Padding" Value="8,3"/>
+                                                            <Setter Property="Background" Value="Transparent"/>
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="{x:Type TreeViewItem}">
                                                                         <Grid>
-                                                                            <Grid.ColumnDefinitions>
-                                                                                <ColumnDefinition Width="Auto"/>
-                                                                                <ColumnDefinition Width="*"/>
-                                                                            </Grid.ColumnDefinitions>
+                                                                            <Grid.RowDefinitions>
+                                                                                <RowDefinition Height="Auto"/>
+                                                                                <RowDefinition Height="Auto"/>
+                                                                            </Grid.RowDefinitions>
 
-                                                                            <!-- Mod Icon -->
-                                                                            <Border Width="32" Height="32" 
-                                                                                  Background="{StaticResource PrimaryBrush}"
-                                                                                  BorderBrush="#333333" BorderThickness="1" 
-                                                                                  CornerRadius="2" Margin="2">
-                                                                                <Image Source="{Binding Icon}" Width="24" Height="24"
-                                                                                     RenderOptions.BitmapScalingMode="HighQuality"
-                                                                                     RenderOptions.EdgeMode="Aliased"/>
+                                                                            <!-- Header row with expand/collapse button -->
+                                                                            <Border x:Name="Bd" Grid.Row="0" 
+                                   Background="{TemplateBinding Background}"
+                                   BorderBrush="{TemplateBinding BorderBrush}"
+                                   BorderThickness="{TemplateBinding BorderThickness}" 
+                                   Padding="{TemplateBinding Padding}">
+                                                                                <Grid>
+                                                                                    <Grid.ColumnDefinitions>
+                                                                                        <ColumnDefinition Width="Auto" MinWidth="19"/>
+                                                                                        <ColumnDefinition Width="*"/>
+                                                                                    </Grid.ColumnDefinitions>
+
+                                                                                    <!-- ExpanderButton -->
+                                                                                    <ToggleButton x:Name="Expander" 
+                                                 IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" 
+                                                 ClickMode="Press"
+                                                 Template="{StaticResource TreeViewItemToggleButton}"/>
+
+                                                                                    <!-- Header content -->
+                                                                                    <ContentPresenter x:Name="PART_Header" 
+                                                    Grid.Column="1"
+                                                    ContentSource="Header"
+                                                    HorizontalAlignment="Left" 
+                                                    VerticalAlignment="Center"/>
+                                                                                </Grid>
                                                                             </Border>
 
-                                                                            <!-- Mod Name and Author -->
-                                                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                                                <TextBlock Text="{Binding Name}" 
-                                                                                         FontWeight="SemiBold" 
-                                                                                         Foreground="{StaticResource TextBrush}"/>
-                                                                                <TextBlock Text="{Binding AuthorDisplay}" 
-                                                                                         FontSize="11" 
-                                                                                         Foreground="{StaticResource TextSecondaryBrush}"/>
-                                                                            </StackPanel>
+                                                                            <!-- ItemsPresenter (child items container) -->
+                                                                            <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Margin="20,0,0,0"/>
                                                                         </Grid>
-                                                                    </DataTemplate>
-                                                                </GridViewColumn.CellTemplate>
-                                                            </GridViewColumn>
 
-                                                            <!-- Priority Number (now on the right) -->
-                                                            <GridViewColumn Width="50">
-                                                                <GridViewColumn.CellTemplate>
-                                                                    <DataTemplate>
-                                                                        <Border Background="{StaticResource AMOGoldGradient}" 
-                                                                               Width="24" Height="24" 
-                                                                               CornerRadius="4"
-                                                                               HorizontalAlignment="Center"
-                                                                               VerticalAlignment="Center">
-                                                                            <TextBlock Text="{Binding PriorityDisplay}" 
-                                                                                     FontWeight="Bold" 
-                                                                                     Foreground="Black"
-                                                                                     HorizontalAlignment="Center"
-                                                                                     VerticalAlignment="Center" FontSize="14"/>
-                                                                        </Border>
-                                                                    </DataTemplate>
-                                                                </GridViewColumn.CellTemplate>
-                                                            </GridViewColumn>
-                                                        </GridView>
-                                                    </ListView.View>
-                                                </ListView>
+                                                                        <!-- Visual states and triggers -->
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsExpanded" Value="False">
+                                                                                <Setter Property="Visibility" Value="Collapsed" TargetName="ItemsHost"/>
+                                                                            </Trigger>
+                                                                            <Trigger Property="HasItems" Value="False">
+                                                                                <Setter Property="Visibility" Value="Hidden" TargetName="Expander"/>
+                                                                            </Trigger>
+                                                                            <!-- Selection highlight -->
+                                                                            <Trigger Property="IsSelected" Value="True">
+                                                                                <Setter Property="Background" Value="#33FD9A69" TargetName="Bd"/>
+                                                                            </Trigger>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter Property="Background" Value="#1AFD9A69" TargetName="Bd"/>
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </Style>
+                                                    </TreeView.Resources>
+                                                </TreeView>
                                             </Grid>
                                         </Border>
                                     </Grid>
