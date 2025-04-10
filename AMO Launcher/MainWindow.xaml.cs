@@ -4,21 +4,18 @@ using AMO_Launcher.Utilities;
 using AMO_Launcher.Views;
 using CommunityToolkit.Mvvm.Input;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-
+using System.Collections.ObjectModel;
 
 namespace AMO_Launcher
 {
@@ -30,19 +27,19 @@ namespace AMO_Launcher
         private GameBackupService _gameBackupService => App.GameBackupService;
         private ProfileService _profileService => App.ProfileService;
         private List<ModProfile> _profiles = new List<ModProfile>();
-        private ModProfile? _activeProfile;
+        private ModProfile _activeProfile;
         private ObservableCollection<object> _selectedTreeViewItems = new ObservableCollection<object>();
-        private object? _lastSelectedItem = null;
+        private object _lastSelectedItem = null;
         private bool _isCtrlPressed = false;
         private bool _isShiftPressed = false;
         private List<object> _flattenedTreeItems = new List<object>();
 
-        private ObservableCollection<ModInfo> _availableModsFlat = new ObservableCollection<ModInfo>();
-        private ObservableCollection<ModCategory> _availableModsCategories = new ObservableCollection<ModCategory>();
-        private ObservableCollection<ModInfo> _appliedMods = new ObservableCollection<ModInfo>();
-        private ObservableCollection<ModCategory> _appliedModsCategories = new ObservableCollection<ModCategory>();
+        private ObservableCollection<ModInfo> _availableModsFlat;
+        private ObservableCollection<ModCategory> _availableModsCategories;
+        private ObservableCollection<ModInfo> _appliedMods;
+        private ObservableCollection<ModCategory> _appliedModsCategories;
 
-        private GameInfo? _currentGame;
+        private GameInfo _currentGame;
 
         private bool _appliedModsChanged = false;
 
@@ -83,10 +80,10 @@ namespace AMO_Launcher
 
                 AvailableModsTreeView.ItemsSource = _availableModsCategories;
                 AppliedModsTreeView.ItemsSource = _appliedModsCategories;
-                AppliedModsTab.GotFocus += AppliedModsTab_GotFocus;
-                ModTabControl.SelectionChanged += ModTabControl_SelectionChanged;
 
                 Title = $"AMO Launcher v{GetAppVersion()}";
+
+                this.SizeChanged += MainWindow_SizeChanged;
 
                 if (ModTabControl != null)
                 {
@@ -121,7 +118,7 @@ namespace AMO_Launcher
         private string GetAppVersion()
         {
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "Unknown";
+            return $"{version.Major}.{version.Minor}.{version.Build}";
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -183,9 +180,6 @@ namespace AMO_Launcher
 
                     InitializeUi();
 
-                    // Ensure GameContentPanel fills its available height
-                    AdjustGameContentPanelHeight();
-
                     App.LogService.Info("MainWindow loaded successfully");
                     FlowTracker.StepFlow("MainWindowLoad", "Complete");
                 }
@@ -203,33 +197,6 @@ namespace AMO_Launcher
                 }
             }
         }
-
-        private void AdjustGameContentPanelHeight()
-        {
-            if (GameContentPanel != null)
-            {
-                // Ensure the Border stretches to fill available space
-                GameContentPanel.VerticalAlignment = VerticalAlignment.Stretch;
-
-                // Also subscribe to the SizeChanged event to handle resizing
-                if (!_isHeightAdjustmentSubscribed)
-                {
-                    this.SizeChanged += (s, e) =>
-                    {
-                        if (e.HeightChanged)
-                        {
-                            // Handle window resize to ensure GameContentPanel fills height
-                            GameContentPanel.InvalidateMeasure();
-                        }
-                    };
-                    _isHeightAdjustmentSubscribed = true;
-                }
-
-                App.LogService.LogDebug("Adjusted GameContentPanel height to fill available space");
-            }
-        }
-
-        private bool _isHeightAdjustmentSubscribed = false;
 
         #region Custom Title Bar Handlers
 
@@ -273,22 +240,6 @@ namespace AMO_Launcher
 
         private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            // Update the applied mods border size when window size changes
-            UpdateAppliedModsBorderSize();
-
-            // Force layout update on TreeViews to ensure scrollbars update correctly
-            if (AppliedModsTreeView != null && AppliedModsTreeView.Visibility == Visibility.Visible)
-            {
-                AppliedModsTreeView.InvalidateMeasure();
-                AppliedModsTreeView.UpdateLayout();
-                if (AppliedModsScrollViewer != null)
-                {
-                    AppliedModsScrollViewer.InvalidateScrollInfo();
-                    AppliedModsScrollViewer.UpdateLayout();
-                }
-            }
-
-            // The existing window state detection code
             if (this.WindowState == WindowState.Maximized)
             {
                 MaximizeButton.Content = "\uE923";
@@ -300,7 +251,6 @@ namespace AMO_Launcher
                 _isMaximized = false;
             }
         }
-
 
         #endregion
 
@@ -1004,31 +954,12 @@ namespace AMO_Launcher
             if (_appliedMods.Count == 0)
             {
                 AppliedModsTreeView.Visibility = Visibility.Collapsed;
-                AppliedModsScrollViewer.Visibility = Visibility.Collapsed;
                 return;
             }
 
-            // Set the TreeView ItemsSource to the flat list of mods
+            // Set the TreeView ItemsSource directly to the flat list of mods
             AppliedModsTreeView.ItemsSource = _appliedMods;
-
-            // Set visibility for both controls
             AppliedModsTreeView.Visibility = Visibility.Visible;
-            AppliedModsScrollViewer.Visibility = Visibility.Visible;
-
-            // Update height-related properties to ensure scrollable area is calculated correctly
-            AppliedModsTreeView.MaxHeight = double.PositiveInfinity;
-            AppliedModsTreeView.ClipToBounds = false; // Prevent clipping of content
-
-            // Force layout recalculation
-            AppliedModsTreeView.UpdateLayout();
-            AppliedModsScrollViewer.UpdateLayout();
-
-            // Schedule additional layout updates after initial layout is complete
-            Dispatcher.InvokeAsync(() => {
-                // Ensure scrollbars recalculate after layout
-                AppliedModsScrollViewer.InvalidateScrollInfo();
-                AppliedModsScrollViewer.UpdateLayout();
-            }, System.Windows.Threading.DispatcherPriority.Loaded);
 
             App.LogService.LogDebug($"Applied mods TreeView updated with {_appliedMods.Count} mods (flat list)");
         }
@@ -1473,6 +1404,7 @@ namespace AMO_Launcher
             }, "Move mod to bottom");
         }
 
+        // Helper method to select a mod in the TreeView
         private void SelectModInTreeView(ModInfo modToSelect)
         {
             foreach (var category in _appliedModsCategories)
@@ -1501,6 +1433,7 @@ namespace AMO_Launcher
             }
         }
 
+        // Helper method to find a TreeViewItem by its data context
         private TreeViewItem GetTreeViewItem(ItemsControl container, object item)
         {
             if (container == null) return null;
@@ -1513,6 +1446,7 @@ namespace AMO_Launcher
             return null;
         }
 
+        // Helper method to find a TreeViewItem recursively
         private TreeViewItem GetTreeViewItemRecursive(ItemsControl container, object item)
         {
             if (container == null) return null;
@@ -1883,7 +1817,7 @@ namespace AMO_Launcher
             }, "Update mod priorities");
         }
 
-        private void CopyDirectoryContents(string sourceDir, string targetDir, Views.BackupProgressWindow? progressWindow = null)
+        private void CopyDirectoryContents(string sourceDir, string targetDir, Views.BackupProgressWindow progressWindow = null)
         {
             ErrorHandler.ExecuteSafe(() => {
                 try
@@ -2028,25 +1962,25 @@ namespace AMO_Launcher
         public class RelayCommand<T> : ICommand
         {
             private readonly Action<T> _execute;
-            private readonly Predicate<T>? _canExecute;
+            private readonly Predicate<T> _canExecute;
 
-            public RelayCommand(Action<T> execute, Predicate<T>? canExecute = null)
+            public RelayCommand(Action<T> execute, Predicate<T> canExecute = null)
             {
                 _execute = execute ?? throw new ArgumentNullException(nameof(execute));
                 _canExecute = canExecute;
             }
 
-            public bool CanExecute(object? parameter)
+            public bool CanExecute(object parameter)
             {
-                return _canExecute == null || _canExecute((T)parameter!);
+                return _canExecute == null || _canExecute((T)parameter);
             }
 
-            public void Execute(object? parameter)
+            public void Execute(object parameter)
             {
-                _execute((T)parameter!);
+                _execute((T)parameter);
             }
 
-            public event EventHandler? CanExecuteChanged
+            public event EventHandler CanExecuteChanged
             {
                 add { CommandManager.RequerySuggested += value; }
                 remove { CommandManager.RequerySuggested -= value; }
@@ -2256,6 +2190,7 @@ namespace AMO_Launcher
                         UpdateAppliedModsTreeView();
 
                         _configService.MarkModsChanged();
+
                         SaveAppliedMods();
                     }
                 }
@@ -4798,99 +4733,6 @@ namespace AMO_Launcher
             }
         }
 
-        private void AppliedModsTab_GotFocus(object sender, RoutedEventArgs e)
-        {
-            RefreshScrollViewers();
-        }
-
-        private void ModTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (ModTabControl.SelectedItem == AppliedModsTab)
-            {
-                UpdateAppliedModsBorderSize();
-                RefreshScrollViewers();
-            }
-        }
-
-        private void RefreshScrollViewers()
-        {
-            // Ensure this happens after the current layout pass
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (AppliedModsTab.IsSelected)
-                {
-                    UpdateAppliedModsBorderSize();
-                }
-
-                if (AppliedModsTreeView != null && AppliedModsTreeView.Visibility == Visibility.Visible)
-                {
-                    // Force layout updates
-                    AppliedModsTreeView.InvalidateMeasure();
-                    AppliedModsTreeView.UpdateLayout();
-
-                    if (AppliedModsScrollViewer != null)
-                    {
-                        // Force scrollbar updates
-                        AppliedModsScrollViewer.InvalidateScrollInfo();
-                        AppliedModsScrollViewer.UpdateLayout();
-                    }
-                }
-            }, System.Windows.Threading.DispatcherPriority.Render);
-        }
-
-        private void UpdateAppliedModsBorderSize()
-        {
-            if (AppliedModsBorder == null || ModTabControl == null)
-                return;
-
-            try
-            {
-                // Get container measurements
-                FrameworkElement tabContent = ModTabControl.SelectedContent as FrameworkElement;
-                if (tabContent == null) return;
-
-                // Find parent Grid that contains our content
-                var parentGrid = FindParentGrid(tabContent);
-                if (parentGrid == null) return;
-
-                // Calculate available height for the border
-                double totalAvailableHeight = parentGrid.ActualHeight;
-
-                // Subtract height of other elements within the same container
-                // (Labels, headers, padding, etc.)
-                double otherElementsHeight = 30; // Approx height of the label + margins
-
-                // Calculate max height for the border
-                double maxHeight = Math.Max(150, totalAvailableHeight - otherElementsHeight);
-
-                // Set the border's height
-                AppliedModsBorder.MaxHeight = maxHeight;
-
-                // Force layout update
-                AppliedModsScrollViewer.InvalidateScrollInfo();
-                AppliedModsScrollViewer.UpdateLayout();
-
-                App.LogService.LogDebug($"Applied mods border height updated to {maxHeight}px");
-            }
-            catch (Exception ex)
-            {
-                App.LogService.Warning($"Failed to update border size: {ex.Message}");
-            }
-        }
-
-        private Grid FindParentGrid(DependencyObject element)
-        {
-            DependencyObject parent = VisualTreeHelper.GetParent(element);
-            while (parent != null)
-            {
-                if (parent is Grid grid)
-                    return grid;
-
-                parent = VisualTreeHelper.GetParent(parent);
-            }
-            return null;
-        }
-
 
 
         // ===== Enhanced Error Logging and Diagnostics =====
@@ -5076,6 +4918,7 @@ namespace AMO_Launcher
         }
     }
 
+    // Extension method for grouping mods by category
     public static class ModExtensions
     {
         public static ObservableCollection<ModCategory> GroupByCategory(this IEnumerable<ModInfo> mods)
@@ -5089,7 +4932,8 @@ namespace AMO_Launcher
 
                 if (!categoryDict.TryGetValue(categoryName, out var category))
                 {
-                    category = new ModCategory(categoryName) { Mods = new ObservableCollection<ModInfo>() };
+                    // Use the constructor instead of object initializer
+                    category = new ModCategory(categoryName);
                     categoryDict[categoryName] = category;
                     categories.Add(category);
                 }
