@@ -697,27 +697,32 @@
 
                                                 <!-- Applied Mods TreeView with direct vertical scrolling -->
                                                 <TreeView x:Name="AppliedModsTreeView" 
-         Background="Transparent" 
-         BorderThickness="0"
-         Visibility="Collapsed"
-         MouseDoubleClick="AppliedModsTreeView_MouseDoubleClick"
-         ContextMenu="{StaticResource ModManagementContextMenu}">
+                                                         Background="Transparent" 
+                                                         BorderThickness="0"
+                                                         MaxHeight="500"
+                                                         Visibility="Collapsed"
+                                                         MouseDoubleClick="AppliedModsTreeView_MouseDoubleClick"
+                                                         ContextMenu="{StaticResource ModManagementContextMenu}">
                                                     <TreeView.Resources>
                                                         <!-- Template for category headers -->
                                                         <HierarchicalDataTemplate DataType="{x:Type models:ModCategory}" 
-                               ItemsSource="{Binding Mods}">
+                                 ItemsSource="{Binding Mods}">
                                                             <TextBlock Text="{Binding Name}" 
                       FontWeight="Bold" 
                       Foreground="{StaticResource TextBrush}"
                       Margin="0,5,0,5"/>
                                                         </HierarchicalDataTemplate>
 
-                                                        <!-- Template for mod items -->
+                                                        <!-- Template for mod items - MODIFIED to fix priority number position -->
                                                         <DataTemplate DataType="{x:Type models:ModInfo}">
+                                                            <!-- Main Grid with fixed column widths -->
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
+                                                                    <!-- Fixed width for checkbox -->
                                                                     <ColumnDefinition Width="Auto"/>
+                                                                    <!-- Most space for mod info - will expand as needed -->
                                                                     <ColumnDefinition Width="*"/>
+                                                                    <!-- Fixed width for priority number with right alignment -->
                                                                     <ColumnDefinition Width="Auto"/>
                                                                 </Grid.ColumnDefinitions>
 
@@ -751,21 +756,23 @@
                                                                     <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                                         <TextBlock Text="{Binding Name}" 
                                   FontWeight="SemiBold" 
-                                  Foreground="{StaticResource TextBrush}"/>
+                                  Foreground="{StaticResource TextBrush}"
+                                  TextTrimming="CharacterEllipsis"/>
                                                                         <TextBlock Text="{Binding AuthorDisplay}" 
                                   FontSize="11" 
-                                  Foreground="{StaticResource TextSecondaryBrush}"/>
+                                  Foreground="{StaticResource TextSecondaryBrush}"
+                                  TextTrimming="CharacterEllipsis"/>
                                                                     </StackPanel>
                                                                 </Grid>
 
-                                                                <!-- Priority Number -->
+                                                                <!-- Priority Number - fixed width and right-aligned -->
                                                                 <Border Grid.Column="2" 
                        Background="{StaticResource AMOGoldGradient}" 
                        Width="24" Height="24" 
                        CornerRadius="4"
-                       HorizontalAlignment="Center"
+                       HorizontalAlignment="Right"
                        VerticalAlignment="Center"
-                       Margin="5,0,5,0">
+                       Margin="10,0,5,0">
                                                                     <TextBlock Text="{Binding PriorityDisplay}" 
                               FontWeight="Bold" 
                               Foreground="Black"
@@ -834,15 +841,15 @@
 
                                                                                     <!-- ExpanderButton -->
                                                                                     <ToggleButton x:Name="Expander" 
-                                                 IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" 
-                                                 ClickMode="Press"
-                                                 Template="{StaticResource TreeViewItemToggleButton}"/>
+                                                  IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" 
+                                                  ClickMode="Press"
+                                                  Template="{StaticResource TreeViewItemToggleButton}"/>
 
                                                                                     <!-- Header content -->
                                                                                     <ContentPresenter x:Name="PART_Header" 
                                                     Grid.Column="1"
                                                     ContentSource="Header"
-                                                    HorizontalAlignment="Left" 
+                                                    HorizontalAlignment="Stretch" 
                                                     VerticalAlignment="Center"/>
                                                                                 </Grid>
                                                                             </Border>
