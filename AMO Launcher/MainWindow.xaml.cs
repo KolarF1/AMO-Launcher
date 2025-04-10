@@ -3844,11 +3844,11 @@ namespace AMO_Launcher
 
                         if (match.Success)
                         {
-                            string chunkNumber = match.Groups[1].Value;
+                            // Original code extracted chunk number: string chunkNumber = match.Groups[1].Value;
                             string modName = match.Groups[3].Value;
-
                             string priorityStr = priority.ToString("D3");
 
+                            // Always use pakchunk5 instead of the original chunk number
                             string newFileName = $"pakchunk5-{priorityStr}-AMO-{modName}.pak";
                             string destPath = Path.Combine(paksDirectory, newFileName);
 
@@ -3874,14 +3874,17 @@ namespace AMO_Launcher
                         }
                         else if (fileName.StartsWith("pakchunk", StringComparison.OrdinalIgnoreCase))
                         {
+                            // For files without a regex match but still pakchunk files
                             int dashIndex = fileName.IndexOf('-');
-                            string chunkNumber = dashIndex > 0
-                                ? fileName.Substring(8, dashIndex - 8)
-                                : fileName.Substring(8, fileName.Length - 8 - 4);
+                            // Original code extracted chunk number from original file
+                            // string chunkNumber = dashIndex > 0
+                            //     ? fileName.Substring(8, dashIndex - 8)
+                            //     : fileName.Substring(8, fileName.Length - 8 - 4);
 
                             string modName = mod.Name.Replace(' ', '_');
                             string priorityStr = priority.ToString("D3");
 
+                            // Always use pakchunk5
                             string newFileName = $"pakchunk5-{priorityStr}-AMO-{modName}.pak";
                             string destPath = Path.Combine(paksDirectory, newFileName);
 
@@ -3946,12 +3949,12 @@ namespace AMO_Launcher
 
                                 if (match.Success)
                                 {
-                                    string chunkNumber = match.Groups[1].Value;
+                                    // Original code extracted chunk number: string chunkNumber = match.Groups[1].Value;
                                     string modName = match.Groups[3].Value;
-
                                     string priorityStr = priority.ToString("D3");
 
-                                    string newFileName = $"pakchunk{chunkNumber}-{priorityStr}-AMO-{modName}.pak";
+                                    // Always use pakchunk5 instead of the original chunk number
+                                    string newFileName = $"pakchunk5-{priorityStr}-AMO-{modName}.pak";
                                     string destPath = Path.Combine(paksDirectory, newFileName);
 
                                     App.LogService.Trace($"Extracting to: {newFileName}");
@@ -3998,15 +4001,18 @@ namespace AMO_Launcher
                                 }
                                 else if (fileName.StartsWith("pakchunk", StringComparison.OrdinalIgnoreCase))
                                 {
+                                    // For files without a regex match but still pakchunk files
                                     int dashIndex = fileName.IndexOf('-');
-                                    string chunkNumber = dashIndex > 0
-                                        ? fileName.Substring(8, dashIndex - 8)
-                                        : fileName.Substring(8, fileName.Length - 8 - 4);
+                                    // Original code extracted chunk number from original file
+                                    // string chunkNumber = dashIndex > 0
+                                    //     ? fileName.Substring(8, dashIndex - 8)
+                                    //     : fileName.Substring(8, fileName.Length - 8 - 4);
 
                                     string modName = mod.Name.Replace(' ', '_');
                                     string priorityStr = priority.ToString("D3");
 
-                                    string newFileName = $"pakchunk{chunkNumber}-{priorityStr}-AMO-{modName}.pak";
+                                    // Always use pakchunk5
+                                    string newFileName = $"pakchunk5-{priorityStr}-AMO-{modName}.pak";
                                     string destPath = Path.Combine(paksDirectory, newFileName);
 
                                     App.LogService.Trace($"Extracting to: {newFileName}");
