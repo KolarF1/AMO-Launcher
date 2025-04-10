@@ -25,7 +25,6 @@
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         </Style>
 
-        <!-- Window Button Style -->
         <Style x:Key="WindowButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="32"/>
@@ -121,7 +120,6 @@
             </Setter>
         </Style>
 
-        <!-- Column Header Style -->
         <Style x:Key="ColumnHeaderStyle" TargetType="{x:Type TextBlock}">
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -130,7 +128,6 @@
             <Setter Property="HorizontalAlignment" Value="Left"/>
         </Style>
 
-        <!-- Tab Header Text Style -->
         <Style x:Key="TabHeaderTextStyle" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="Foreground" Value="White" />
@@ -141,7 +138,6 @@
             </Style.Triggers>
         </Style>
 
-        <!-- New Button Styles for the requested buttons -->
         <Style x:Key="LaunchGameButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
             <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
             <Setter Property="Foreground" Value="Black"/>
@@ -186,7 +182,6 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- FIXED: Explicitly set Foreground to ensure text visibility -->
                                     <TextBlock Grid.Column="0"
                                                x:Name="ContentSite" 
                                                Text="{Binding SelectedItem, RelativeSource={RelativeSource TemplatedParent}}"
@@ -197,7 +192,6 @@
                                                TextAlignment="Left"
                                                Foreground="Black"/>
 
-                                    <!-- Dropdown Arrow -->
                                     <iconPacks:PackIconBootstrapIcons Grid.Column="1" 
                                                              Kind="ChevronDown" 
                                                              Width="12" Height="12" 
@@ -205,7 +199,6 @@
                                                              Foreground="Black"
                                                              Margin="8,0,8,0"/>
 
-                                    <!-- Transparent ToggleButton for capturing clicks -->
                                     <ToggleButton Grid.ColumnSpan="2" 
                                          x:Name="ToggleButton"
                                          Focusable="false"
@@ -221,7 +214,6 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Popup for dropdown items -->
                             <Popup x:Name="Popup" 
                           IsOpen="{TemplateBinding IsDropDownOpen}" 
                           Placement="Bottom"
@@ -261,7 +253,6 @@
                 </Setter.Value>
             </Setter>
 
-            <!-- Item Container Style (for ComboBoxItems) -->
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
@@ -566,9 +557,10 @@
 
                                                             <!-- Header row with expand/collapse button -->
                                                             <Border x:Name="Bd" Grid.Row="0" 
-                                                                    Background="{TemplateBinding Background}"
-                                                                    BorderThickness="0" 
-                                                                    Padding="{TemplateBinding Padding}">
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" 
+                            Padding="{TemplateBinding Padding}">
                                                                 <Grid>
                                                                     <Grid.ColumnDefinitions>
                                                                         <ColumnDefinition Width="Auto" MinWidth="19"/>
@@ -577,16 +569,16 @@
 
                                                                     <!-- ExpanderButton -->
                                                                     <ToggleButton x:Name="Expander" 
-                                                                                  IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" 
-                                                                                  ClickMode="Press"
-                                                                                  Template="{StaticResource TreeViewItemToggleButton}"/>
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" 
+                                          ClickMode="Press"
+                                          Template="{StaticResource TreeViewItemToggleButton}"/>
 
                                                                     <!-- Header content -->
                                                                     <ContentPresenter x:Name="PART_Header" 
-                                                                                      Grid.Column="1"
-                                                                                      ContentSource="Header"
-                                                                                      HorizontalAlignment="Left" 
-                                                                                      VerticalAlignment="Center"/>
+                                              Grid.Column="1"
+                                              ContentSource="Header"
+                                              HorizontalAlignment="Left" 
+                                              VerticalAlignment="Center"/>
                                                                 </Grid>
                                                             </Border>
 
@@ -602,6 +594,7 @@
                                                             <Trigger Property="HasItems" Value="False">
                                                                 <Setter Property="Visibility" Value="Hidden" TargetName="Expander"/>
                                                             </Trigger>
+                                                            <!-- Keep the original selected item visual indicator -->
                                                             <Trigger Property="IsSelected" Value="True">
                                                                 <Setter Property="Background" Value="#33FD9A69" TargetName="Bd"/>
                                                             </Trigger>

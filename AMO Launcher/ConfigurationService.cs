@@ -16,6 +16,7 @@ namespace AMO_Launcher.Services
         private readonly string _configFilePath;
         private readonly string _iconCacheFolderPath;
         private AppSettings _currentSettings;
+        private static SemaphoreSlim _fileSemaphore = new SemaphoreSlim(1, 1);
 
         public ConfigurationService()
         {
@@ -226,53 +227,71 @@ namespace AMO_Launcher.Services
                 var startTime = DateTime.Now;
                 App.LogService?.LogDebug("Saving application settings");
 
-                // Create a backup before saving
-                BackupSettingsFile();
-
-                string json = JsonSerializer.Serialize(_currentSettings, new JsonSerializerOptions
+                try
                 {
-                    WriteIndented = true
-                });
+                    // Wait to acquire the semaphore
+                    await _fileSemaphore.WaitAsync();
 
-                await File.WriteAllTextAsync(_configFilePath, json);
-                App.LogService?.LogDebug($"Settings saved to: {_configFilePath}");
+                    // Create a backup before saving
+                    BackupSettingsFile();
 
-                // Save icons for manually added games
-                int iconCount = 0;
-                int failedIcons = 0;
-
-                App.LogService?.LogDebug("Saving icons for manually added games");
-                foreach (var game in _currentSettings.Games)
-                {
-                    if (game.IsManuallyAdded && !string.IsNullOrEmpty(game.ExecutablePath))
+                    string json = JsonSerializer.Serialize(_currentSettings, new JsonSerializerOptions
                     {
-                        try
+                        WriteIndented = true
+                    });
+
+                    // Use FileShare.Read to allow reading but prevent other writes
+                    using (var fileStream = new FileStream(_configFilePath, FileMode.Create, FileAccess.Write, FileShare.Read))
+                    using (var writer = new StreamWriter(fileStream))
+                    {
+                        await writer.WriteAsync(json);
+                        await writer.FlushAsync();
+                    }
+
+                    App.LogService?.LogDebug($"Settings saved to: {_configFilePath}");
+
+                    // Save icons for manually added games
+                    int iconCount = 0;
+                    int failedIcons = 0;
+
+                    App.LogService?.LogDebug("Saving icons for manually added games");
+                    foreach (var game in _currentSettings.Games)
+                    {
+                        if (game.IsManuallyAdded && !string.IsNullOrEmpty(game.ExecutablePath))
                         {
-                            // Try to get the icon from the cache and save it
-                            var icon = App.IconCacheService.GetIcon(game.ExecutablePath);
-                            if (icon != null)
+                            try
                             {
-                                SaveIconToDisk(game.ExecutablePath, icon);
-                                iconCount++;
-                                App.LogService?.Trace($"Saved icon for game: {game.Name} ({game.ExecutablePath})");
+                                // Try to get the icon from the cache and save it
+                                var icon = App.IconCacheService.GetIcon(game.ExecutablePath);
+                                if (icon != null)
+                                {
+                                    SaveIconToDisk(game.ExecutablePath, icon);
+                                    iconCount++;
+                                    App.LogService?.Trace($"Saved icon for game: {game.Name} ({game.ExecutablePath})");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                failedIcons++;
+                                App.LogService?.Warning($"Error saving icon for {game.ExecutablePath}: {ex.Message}");
+                                App.LogService?.LogDebug($"Icon save error details: {ex}");
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            failedIcons++;
-                            App.LogService?.Warning($"Error saving icon for {game.ExecutablePath}: {ex.Message}");
-                            App.LogService?.LogDebug($"Icon save error details: {ex}");
-                        }
                     }
+
+                    App.LogService?.LogDebug($"Icon saving complete - saved {iconCount} icons, {failedIcons} failed");
+
+                    // Calculate elapsed time
+                    var elapsed = DateTime.Now - startTime;
+                    App.LogService?.LogDebug($"SaveSettingsAsync completed in {elapsed.TotalMilliseconds:F1}ms");
+
+                    App.LogService?.Info("Settings saved successfully");
                 }
-
-                App.LogService?.LogDebug($"Icon saving complete - saved {iconCount} icons, {failedIcons} failed");
-
-                // Calculate elapsed time
-                var elapsed = DateTime.Now - startTime;
-                App.LogService?.LogDebug($"SaveSettingsAsync completed in {elapsed.TotalMilliseconds:F1}ms");
-
-                App.LogService?.Info("Settings saved successfully");
+                finally
+                {
+                    // Always release the semaphore
+                    _fileSemaphore.Release();
+                }
             }, "SaveSettingsAsync");
         }
 

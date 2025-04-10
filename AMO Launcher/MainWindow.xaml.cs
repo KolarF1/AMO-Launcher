@@ -28,6 +28,11 @@ namespace AMO_Launcher
         private ProfileService _profileService => App.ProfileService;
         private List<ModProfile> _profiles = new List<ModProfile>();
         private ModProfile _activeProfile;
+        private ObservableCollection<object> _selectedTreeViewItems = new ObservableCollection<object>();
+        private object _lastSelectedItem = null;
+        private bool _isCtrlPressed = false;
+        private bool _isShiftPressed = false;
+        private List<object> _flattenedTreeItems = new List<object>();
 
         private ObservableCollection<ModInfo> _availableModsFlat;
         private ObservableCollection<ModCategory> _availableModsCategories;
@@ -60,6 +65,9 @@ namespace AMO_Launcher
             {
                 InitializeComponent();
                 InitializeConflictSystem();
+
+                // Initialize multi-select functionality for the TreeView
+                InitializeTreeViewMultiSelect();
 
                 App.UpdateService.UpdateAvailable += UpdateService_UpdateAvailable;
                 App.UpdateService.UpdateCheckFailed += UpdateService_UpdateCheckFailed;
@@ -324,10 +332,9 @@ namespace AMO_Launcher
         {
             base.OnInitialized(e);
 
+            // Previous events - should be kept
             AvailableModsTreeView.SelectedItemChanged += AvailableModsTreeView_SelectedItemChanged;
-
             AvailableModsTreeView.MouseDoubleClick += AvailableModsTreeView_MouseDoubleClick;
-
             AppliedModsListView.MouseDoubleClick += AppliedModsListView_MouseDoubleClick;
         }
 
@@ -346,7 +353,25 @@ namespace AMO_Launcher
                 if (item is ModInfo selectedMod)
                 {
                     App.LogService.LogDebug($"Double-clicked on mod: {selectedMod.Name}");
-                    AddModToApplied(selectedMod);
+
+                    // Multi-select processing: if Control/Shift was used for selection and multiple items are selected
+                    if (_selectedTreeViewItems.Count > 1 && (_isCtrlPressed || _isShiftPressed))
+                    {
+                        foreach (var selectedItem in _selectedTreeViewItems)
+                        {
+                            if (selectedItem is ModInfo mod)
+                            {
+                                AddModToApplied(mod);
+                            }
+                        }
+
+                        App.LogService.Info($"Applied {_selectedTreeViewItems.Count} mods via double-click");
+                    }
+                    else
+                    {
+                        // Single item processing
+                        AddModToApplied(selectedMod);
+                    }
 
                     ModTabControl.SelectedItem = AppliedModsTab;
                 }
@@ -406,9 +431,9 @@ namespace AMO_Launcher
             }, "Change game");
         }
 
-        private void ApplyModsButton_Click(object sender, RoutedEventArgs e)
+        private async void ApplyModsButton_Click(object sender, RoutedEventArgs e)
         {
-            ErrorHandler.ExecuteSafe(() => {
+            await ErrorHandler.ExecuteSafeAsync(async () => {
                 if (_currentGame == null)
                 {
                     App.LogService.Warning("Attempted to apply mods with no game selected");
@@ -417,33 +442,83 @@ namespace AMO_Launcher
                     return;
                 }
 
-                var selectedItem = AvailableModsTreeView.SelectedItem;
-                if (selectedItem == null)
-                {
-                    App.LogService.Info("No mods selected to apply");
-                    MessageBox.Show("Please select one or more mods to apply.", "No Mods Selected",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
+                Mouse.OverrideCursor = Cursors.Wait;
+                bool modsAdded = false;
 
-                if (selectedItem is ModInfo selectedMod)
+                try
                 {
-                    App.LogService.Info($"Applying selected mod: {selectedMod.Name}");
-                    AddModToApplied(selectedMod);
-                    ModTabControl.SelectedItem = AppliedModsTab;
-                    return;
-                }
-
-                if (selectedItem is ModCategory category)
-                {
-                    App.LogService.Info($"Applying all mods in category: {category.Name} ({category.Mods.Count} mods)");
-                    foreach (var mod in category.Mods)
+                    // Check if we have any items in the multi-selection collection
+                    if (_selectedTreeViewItems.Count > 0)
                     {
-                        AddModToApplied(mod);
+                        App.LogService.Info($"Applying {_selectedTreeViewItems.Count} selected mods/categories");
+
+                        int modsApplied = 0;
+                        foreach (var treeViewSelectedItem in _selectedTreeViewItems)
+                        {
+                            if (treeViewSelectedItem is ModInfo treeViewSelectedMod)
+                            {
+                                await AddModToAppliedAsync(treeViewSelectedMod);
+                                modsApplied++;
+                                modsAdded = true;
+                            }
+                            else if (treeViewSelectedItem is ModCategory treeViewSelectedCategory)
+                            {
+                                foreach (var mod in treeViewSelectedCategory.Mods)
+                                {
+                                    await AddModToAppliedAsync(mod);
+                                    modsApplied++;
+                                    modsAdded = true;
+                                }
+                            }
+                        }
+
+                        if (modsApplied > 0)
+                        {
+                            ModTabControl.SelectedItem = AppliedModsTab;
+                            App.LogService.Info($"Successfully applied {modsApplied} mods");
+                        }
+                    }
+                    else
+                    {
+                        // If no multi-selection, fall back to standard selection behavior
+                        var treeViewItem = AvailableModsTreeView.SelectedItem;
+                        if (treeViewItem == null)
+                        {
+                            App.LogService.Info("No mods selected to apply");
+                            MessageBox.Show("Please select one or more mods to apply.", "No Mods Selected",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+
+                        if (treeViewItem is ModInfo treeViewMod)
+                        {
+                            App.LogService.Info($"Applying selected mod: {treeViewMod.Name}");
+                            await AddModToAppliedAsync(treeViewMod);
+                            ModTabControl.SelectedItem = AppliedModsTab;
+                            modsAdded = true;
+                        }
+                        else if (treeViewItem is ModCategory treeViewCategory)
+                        {
+                            App.LogService.Info($"Applying all mods in category: {treeViewCategory.Name} ({treeViewCategory.Mods.Count} mods)");
+                            foreach (var mod in treeViewCategory.Mods)
+                            {
+                                await AddModToAppliedAsync(mod);
+                                modsAdded = true;
+                            }
+
+                            ModTabControl.SelectedItem = AppliedModsTab;
+                        }
                     }
 
-                    ModTabControl.SelectedItem = AppliedModsTab;
-                    return;
+                    // Only save applied mods once at the end if any mods were added
+                    if (modsAdded)
+                    {
+                        await SaveAppliedModsAsync();
+                    }
+                }
+                finally
+                {
+                    Mouse.OverrideCursor = null;
                 }
             }, "Apply mods");
         }
@@ -931,6 +1006,63 @@ namespace AMO_Launcher
                 _appliedMods.Clear();
                 AppliedModsListView.Visibility = Visibility.Collapsed;
             }, "Show no game UI");
+        }
+
+        private async Task AddModToAppliedAsync(ModInfo mod)
+        {
+            await ErrorHandler.ExecuteSafeAsync(async () => {
+                if (mod == null) return;
+
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                try
+                {
+                    App.LogService.Info($"Adding mod to applied list: {mod.Name}");
+
+                    string modPath = mod.IsFromArchive ? mod.ArchiveSource : mod.ModFolderPath;
+                    string absoluteModPath = PathUtility.ToAbsolutePath(modPath);
+
+                    bool alreadyExists = _appliedMods.Any(m =>
+                        PathUtility.ToAbsolutePath(m.ModFolderPath) == absoluteModPath ||
+                        (m.IsFromArchive && PathUtility.ToAbsolutePath(m.ArchiveSource) == absoluteModPath));
+
+                    if (!alreadyExists)
+                    {
+                        App.LogService.LogDebug($"Mod not in applied list, adding it");
+
+                        mod.IsApplied = true;
+                        mod.IsActive = true;
+
+                        _appliedMods.Add(mod);
+                        UpdateModPriorities();
+                        UpdateModPriorityDisplays();
+
+                        AppliedModsListView.Visibility = Visibility.Visible;
+
+                        _configService.MarkModsChanged();
+
+                        App.LogService.LogDebug($"Original mod path: {modPath}");
+                        App.LogService.LogDebug($"Relative path: {PathUtility.ToRelativePath(modPath)}");
+
+                        // Note: We don't save here - we'll save once at the end
+                        DetectModConflicts();
+
+                        App.LogService.Info($"Mod '{mod.Name}' added to applied list");
+                    }
+                    else
+                    {
+                        App.LogService.Info($"Mod '{mod.Name}' already in applied list, skipping");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogCategorizedError($"Error adding mod to applied list", ex, ErrorCategory.ModProcessing);
+                }
+                finally
+                {
+                    Mouse.OverrideCursor = null;
+                }
+            }, "Add mod to applied list");
         }
 
         private void AddModToApplied(ModInfo mod)
@@ -4235,6 +4367,220 @@ namespace AMO_Launcher
         {
             App.LogService.Warning($"Update check failed: {e.Message}");
         }
+
+        private void InitializeTreeViewMultiSelect()
+        {
+            App.LogService.Info("Initializing TreeView multi-select behavior");
+
+            AvailableModsTreeView.PreviewMouseDown += AvailableModsTreeView_PreviewMouseDown;
+            AvailableModsTreeView.PreviewKeyDown += AvailableModsTreeView_PreviewKeyDown;
+            AvailableModsTreeView.PreviewKeyUp += AvailableModsTreeView_PreviewKeyUp;
+
+            // We still want to keep track of the main selected item for description panel
+            AvailableModsTreeView.SelectedItemChanged += AvailableModsTreeView_SelectedItemChanged;
+
+            // Initialize selected items collection
+            _selectedTreeViewItems = new ObservableCollection<object>();
+            _selectedTreeViewItems.CollectionChanged += (s, e) =>
+            {
+                App.LogService.LogDebug($"Selected items count changed: {_selectedTreeViewItems.Count}");
+                UpdateSelectionVisuals();
+            };
+        }
+
+        private void AvailableModsTreeView_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+            {
+                _isCtrlPressed = true;
+            }
+            else if (e.Key == Key.LeftShift || e.Key == Key.RightShift)
+            {
+                _isShiftPressed = true;
+            }
+        }
+
+        private void AvailableModsTreeView_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+            {
+                _isCtrlPressed = false;
+            }
+            else if (e.Key == Key.LeftShift || e.Key == Key.RightShift)
+            {
+                _isShiftPressed = false;
+            }
+        }
+
+        private void AvailableModsTreeView_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // Only handle left mouse button
+            if (e.ChangedButton != MouseButton.Left)
+                return;
+
+            _isCtrlPressed = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
+            _isShiftPressed = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+
+            // Find the clicked TreeViewItem
+            var treeViewItem = FindAncestor<TreeViewItem>((DependencyObject)e.OriginalSource);
+            if (treeViewItem == null)
+                return;
+
+            // Get the data item (ModInfo or ModCategory)
+            var clickedItem = treeViewItem.DataContext;
+
+            // If the item is a category, skip the multi-select logic for now (optional)
+            if (clickedItem is ModCategory && !_isCtrlPressed && !_isShiftPressed)
+                return; // Let default TreeView handling work for categories
+
+            // Handle multi-selection
+            if (_isCtrlPressed)
+            {
+                HandleCtrlSelection(clickedItem);
+                e.Handled = true;
+            }
+            else if (_isShiftPressed)
+            {
+                HandleShiftSelection(clickedItem);
+                e.Handled = true;
+            }
+            else
+            {
+                // Standard click - clear previous selection
+                _selectedTreeViewItems.Clear();
+                _selectedTreeViewItems.Add(clickedItem);
+                _lastSelectedItem = clickedItem;
+
+                // Allow the default selection behavior to continue
+            }
+
+            // If we handled the event, make sure to update the visuals
+            if (e.Handled)
+            {
+                UpdateSelectionVisuals();
+            }
+        }
+
+        private static T FindAncestor<T>(DependencyObject current) where T : DependencyObject
+        {
+            while (current != null && !(current is T))
+            {
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return current as T;
+        }
+
+        private void HandleCtrlSelection(object treeDataItem)
+        {
+            if (_selectedTreeViewItems.Contains(treeDataItem))
+            {
+                // Deselect if already selected
+                _selectedTreeViewItems.Remove(treeDataItem);
+            }
+            else
+            {
+                // Add to selection if not already selected
+                _selectedTreeViewItems.Add(treeDataItem);
+                _lastSelectedItem = treeDataItem;
+            }
+        }
+
+        private void HandleShiftSelection(object treeDataItem)
+        {
+            if (_lastSelectedItem == null)
+            {
+                _selectedTreeViewItems.Add(treeDataItem);
+                _lastSelectedItem = treeDataItem;
+                return;
+            }
+
+            // Build or refresh the flattened list of all items if needed
+            RebuildFlattenedTreeItems();
+
+            // Find the indices of the last selected item and the clicked item
+            int lastIndex = _flattenedTreeItems.IndexOf(_lastSelectedItem);
+            int clickedIndex = _flattenedTreeItems.IndexOf(treeDataItem);
+
+            if (lastIndex < 0 || clickedIndex < 0)
+                return;
+
+            // Clear the current selection
+            _selectedTreeViewItems.Clear();
+
+            // Select the range
+            int startIndex = Math.Min(lastIndex, clickedIndex);
+            int endIndex = Math.Max(lastIndex, clickedIndex);
+
+            for (int i = startIndex; i <= endIndex; i++)
+            {
+                _selectedTreeViewItems.Add(_flattenedTreeItems[i]);
+            }
+
+            // Update the last selected item
+            _lastSelectedItem = treeDataItem;
+        }
+
+        private void RebuildFlattenedTreeItems()
+        {
+            _flattenedTreeItems.Clear();
+
+            foreach (var treeCategory in _availableModsCategories)
+            {
+                // Add the category itself
+                _flattenedTreeItems.Add(treeCategory);
+
+                // Add all mods in the category
+                foreach (var treeMod in treeCategory.Mods)
+                {
+                    _flattenedTreeItems.Add(treeMod);
+                }
+            }
+        }
+
+        private void UpdateSelectionVisuals()
+        {
+            foreach (var item in FindVisualTreeItems<TreeViewItem>(AvailableModsTreeView))
+            {
+                if (item.DataContext != null)
+                {
+                    bool isSelected = _selectedTreeViewItems.Contains(item.DataContext);
+
+                    // Apply visual selection style
+                    if (isSelected)
+                    {
+                        item.Background = new SolidColorBrush(Color.FromArgb(50, 253, 154, 105)); // Light orange background
+                                                                                                  // Remove the border by setting BorderThickness to 0
+                        item.BorderThickness = new Thickness(0);
+                    }
+                    else
+                    {
+                        item.ClearValue(TreeViewItem.BackgroundProperty);
+                        item.ClearValue(TreeViewItem.BorderBrushProperty);
+                        item.BorderThickness = new Thickness(0);
+                    }
+                }
+            }
+        }
+
+        private IEnumerable<T> FindVisualTreeItems<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null)
+                yield break;
+
+            int childCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < childCount; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+
+                if (child is T item)
+                    yield return item;
+
+                foreach (var childOfChild in FindVisualTreeItems<T>(child))
+                    yield return childOfChild;
+            }
+        }
+
+
 
         // ===== Enhanced Error Logging and Diagnostics =====
 
