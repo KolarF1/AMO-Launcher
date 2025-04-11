@@ -11,9 +11,6 @@ namespace AMO_Launcher.Services
     {
         private static GameBackupService _gameBackupService;
 
-        /// <summary>
-        /// Gets the singleton instance of GameBackupService with proper error handling
-        /// </summary>
         public static GameBackupService GetGameBackupService()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -37,9 +34,6 @@ namespace AMO_Launcher.Services
             }, "Getting GameBackupService");
         }
 
-        /// <summary>
-        /// Asynchronously initializes the GameBackupService if needed
-        /// </summary>
         public static async Task<GameBackupService> GetGameBackupServiceAsync()
         {
             return await ErrorHandler.ExecuteSafeAsync(async () =>
@@ -52,9 +46,6 @@ namespace AMO_Launcher.Services
                     }
 
                     _gameBackupService = new GameBackupService();
-
-                    // If the service has any async initialization method, call it here
-                    // await _gameBackupService.InitializeAsync();
 
                     if (App.LogService != null)
                     {

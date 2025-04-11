@@ -8,8 +8,6 @@ namespace AMO_Launcher.Views
 {
     public partial class GameVerificationDialog : Window
     {
-        // Make fields non-readonly to avoid initialization restrictions
-        // or initialize them directly at declaration
         private GameInfo _game;
         private bool _isVersionChange;
 
@@ -19,22 +17,18 @@ namespace AMO_Launcher.Views
         {
             InitializeComponent();
 
-            // Initialize fields after component initialization
             _game = game;
             _isVersionChange = isVersionChange;
 
-            // Log initialization information
             ErrorHandler.ExecuteSafe(() =>
             {
                 App.LogService?.Info($"Opening game verification dialog for game: {game?.Name ?? "unknown"}");
                 App.LogService?.LogDebug($"Dialog parameters - Game: {game?.Name}, IsVersionChange: {isVersionChange}");
 
-                // Set dialog content based on context
                 ConfigureDialogContent();
             }, "Initializing game verification dialog", true);
         }
 
-        // Extract configuration logic to a separate method
         private void ConfigureDialogContent()
         {
             if (_isVersionChange)
@@ -52,7 +46,6 @@ namespace AMO_Launcher.Views
 
             GameNameTextBlock.Text = _game?.Name ?? "Unknown Game";
 
-            // Set the game icon if available
             if (_game?.Icon != null)
             {
                 App.LogService?.LogDebug("Setting game icon in verification dialog");
@@ -66,7 +59,6 @@ namespace AMO_Launcher.Views
             App.LogService?.LogDebug("Game verification dialog initialized successfully");
         }
 
-        // Method to customize the dialog for the Reset operation
         public void CustomizeForReset()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -86,7 +78,6 @@ namespace AMO_Launcher.Views
             }, "Customizing dialog for reset operation", true);
         }
 
-        // Command for dragging the window
         public ICommand DragMoveCommand => new RelayCommand(() =>
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -96,7 +87,6 @@ namespace AMO_Launcher.Views
             }, "Dragging verification dialog window", false);
         });
 
-        // Relay command implementation
         public class RelayCommand : ICommand
         {
             private readonly Action _execute;
@@ -123,7 +113,6 @@ namespace AMO_Launcher.Views
             }
         }
 
-        // Command for canceling/closing
         public ICommand CancelCommand => new RelayCommand(() =>
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -135,7 +124,6 @@ namespace AMO_Launcher.Views
             }, "Handling verification dialog cancel", true);
         });
 
-        // Command for continuing
         public ICommand ContinueCommand => new RelayCommand(() =>
         {
             ErrorHandler.ExecuteSafe(() =>

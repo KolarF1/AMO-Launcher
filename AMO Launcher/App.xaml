@@ -4,31 +4,19 @@
              xmlns:local="clr-namespace:AMO_Launcher"
              DispatcherUnhandledException="Application_DispatcherUnhandledException">
     <Application.Resources>
-        <!-- Application-wide resources -->
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Add any style dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Color Palette (Vibrant AMO Colors) -->
             <Color x:Key="PrimaryColor">#050505</Color>
-            <!-- Almost Black Background -->
             <Color x:Key="SecondaryColor">#121212</Color>
-            <!-- Dark Gray -->
             <Color x:Key="AccentColorLight">#FFD18A</Color>
-            <!-- Vibrant Light Gold -->
             <Color x:Key="AccentColor">#F5A686</Color>
-            <!-- Vibrant Rose Gold Mid -->
             <Color x:Key="AccentColorDark">#E57B6F</Color>
-            <!-- Vibrant Dark Rose Gold -->
             <Color x:Key="NeutralDarkColor">#1A1A1A</Color>
-            <!-- Medium Gray -->
             <Color x:Key="NeutralLightColor">#F0F0F0</Color>
-            <!-- Light Gray -->
             <Color x:Key="ErrorColor">#FF4444</Color>
-            <!-- Error Red -->
 
-            <!-- Brushes -->
             <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
             <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource SecondaryColor}"/>
             <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
@@ -40,27 +28,23 @@
             <SolidColorBrush x:Key="TextBrush" Color="White"/>
             <SolidColorBrush x:Key="TextSecondaryBrush" Color="#BBBBBB"/>
 
-            <!-- Gradient Brushes -->
             <LinearGradientBrush x:Key="HeaderGradientBrush" StartPoint="0,0" EndPoint="1,0">
                 <GradientStop Color="{StaticResource PrimaryColor}" Offset="0.0"/>
                 <GradientStop Color="{StaticResource SecondaryColor}" Offset="1.0"/>
             </LinearGradientBrush>
 
-            <!-- Vibrant AMO Gold Gradient (Top to Bottom) -->
             <LinearGradientBrush x:Key="AMOGoldGradient" StartPoint="0,0" EndPoint="0,1">
                 <GradientStop Color="#FFD18A" Offset="0.0"/>
                 <GradientStop Color="#F5A686" Offset="0.7"/>
                 <GradientStop Color="#E57B6F" Offset="1.0"/>
             </LinearGradientBrush>
 
-            <!-- Vibrant AMO Gold Gradient (Left to Right) -->
             <LinearGradientBrush x:Key="AMOGoldGradientHorizontal" StartPoint="0,0" EndPoint="1,0">
                 <GradientStop Color="#FFD18A" Offset="0.0"/>
                 <GradientStop Color="#F5A686" Offset="0.7"/>
                 <GradientStop Color="#E57B6F" Offset="1.0"/>
             </LinearGradientBrush>
 
-            <!-- AMO Background Pattern -->
             <DrawingBrush x:Key="GeometricBackground" TileMode="Tile" Viewport="0,0,100,100" ViewportUnits="Absolute">
                 <DrawingBrush.Drawing>
                     <DrawingGroup>
@@ -95,7 +79,6 @@
                 </DrawingBrush.Drawing>
             </DrawingBrush>
 
-            <!-- Button styles -->
             <Style x:Key="PrimaryButton" TargetType="Button">
                 <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
                 <Setter Property="Foreground" Value="Black"/>
@@ -212,7 +195,6 @@
                 </Setter>
             </Style>
 
-            <!-- ListViewItem Style -->
             <Style TargetType="ListViewItem">
                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                 <Setter Property="Padding" Value="8,6"/>
@@ -225,7 +207,6 @@
                                 BorderThickness="0" 
                                 CornerRadius="0"
                                 Padding="{TemplateBinding Padding}">
-                                <!-- This ContentPresenter preserves the item's content -->
                                 <GridViewRowPresenter x:Name="RowPresenter" />
                             </Border>
                             <ControlTemplate.Triggers>
@@ -241,7 +222,6 @@
                 </Setter>
             </Style>
 
-            <!-- CheckBox Style (AMO Gold) -->
             <Style x:Key="ModCheckBox" TargetType="CheckBox">
                 <Setter Property="Template">
                     <Setter.Value>
@@ -265,7 +245,6 @@
                 </Setter>
             </Style>
 
-            <!-- GridView Header Style -->
             <Style x:Key="GridViewColumnHeaderStyle" TargetType="GridViewColumnHeader">
                 <Setter Property="Background" Value="{StaticResource SecondaryBrush}"/>
                 <Setter Property="Foreground" Value="White"/>
@@ -277,7 +256,6 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="{x:Type GridViewColumnHeader}">
                             <Grid>
-                                <!-- Main header content -->
                                 <Border x:Name="HeaderBorder"
                                         Background="{TemplateBinding Background}"
                                         BorderBrush="{TemplateBinding BorderBrush}"
@@ -289,15 +267,13 @@
                                                       RecognizesAccessKey="True"
                                                       SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                                 </Border>
-                                
-                                <!-- Bottom accent line that appears on hover -->
+
                                 <Border x:Name="AccentBar" 
                                         Height="2" 
                                         VerticalAlignment="Bottom" 
                                         Background="{StaticResource AccentBrush}" 
                                         Opacity="0"/>
-                                
-                                <!-- Right edge resize grip - SMALLER SIZE AND LESS VISIBLE -->
+
                                 <Thumb x:Name="PART_HeaderGripper"
                                        Width="8"
                                        HorizontalAlignment="Right"
@@ -317,7 +293,6 @@
                 </Setter>
             </Style>
 
-            <!-- Tab Style -->
             <Style x:Key="ModTabStyle" TargetType="Button">
                 <Setter Property="Background" Value="{StaticResource SecondaryBrush}"/>
                 <Setter Property="Foreground" Value="White"/>
@@ -339,7 +314,6 @@
                 </Setter>
             </Style>
 
-            <!-- CheckBox Style -->
             <Style TargetType="CheckBox">
                 <Setter Property="Template">
                     <Setter.Value>
@@ -374,12 +348,10 @@
                 </Setter>
             </Style>
 
-            <!-- SelectedModTab Style -->
             <Style x:Key="ModTabStyleSelected" TargetType="Button" BasedOn="{StaticResource ModTabStyle}">
                 <Setter Property="Background" Value="{StaticResource AMOGoldGradient}"/>
             </Style>
 
-            <!-- Context Menu Style -->
             <Style x:Key="ModContextMenuStyle" TargetType="ContextMenu">
                 <Setter Property="Background" Value="#222222"/>
                 <Setter Property="BorderBrush" Value="#444444"/>
@@ -402,7 +374,6 @@
                 </Setter>
             </Style>
 
-            <!-- Context Menu Item Style -->
             <Style x:Key="ModContextMenuItemStyle" TargetType="MenuItem">
                 <Setter Property="Foreground" Value="White"/>
                 <Setter Property="Background" Value="Transparent"/>
@@ -423,7 +394,6 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Icon placeholder -->
                                     <ContentPresenter x:Name="Icon" 
                                           ContentSource="Icon" 
                                           VerticalAlignment="Center" 
@@ -431,7 +401,6 @@
                                           Width="16" Height="16"
                                           Margin="0,0,8,0"/>
 
-                                    <!-- Menu item header text -->
                                     <ContentPresenter Grid.Column="1" 
                                           ContentSource="Header" 
                                           VerticalAlignment="Center" 
@@ -452,7 +421,6 @@
                 </Setter>
             </Style>
 
-            <!-- Custom ScrollBar Style -->
             <Style x:Key="ModernScrollBarThumb" TargetType="{x:Type Thumb}">
                 <Setter Property="OverridesDefaultStyle" Value="true"/>
                 <Setter Property="IsTabStop" Value="false"/>
@@ -476,7 +444,6 @@
                 </Setter>
             </Style>
 
-            <!-- ScrollBar Button Style (Arrows) -->
             <Style x:Key="ScrollBarLineButton" TargetType="{x:Type RepeatButton}">
                 <Setter Property="OverridesDefaultStyle" Value="true"/>
                 <Setter Property="Focusable" Value="false"/>
@@ -491,7 +458,6 @@
                 </Setter>
             </Style>
 
-            <!-- ScrollBar PageUpDown Button Style -->
             <Style x:Key="ScrollBarPageButton" TargetType="{x:Type RepeatButton}">
                 <Setter Property="OverridesDefaultStyle" Value="true"/>
                 <Setter Property="Focusable" Value="false"/>
@@ -504,7 +470,6 @@
                 </Setter>
             </Style>
 
-            <!-- Main ScrollBar Style -->
             <Style TargetType="{x:Type ScrollBar}">
                 <Setter Property="Stylus.IsPressAndHoldEnabled" Value="false"/>
                 <Setter Property="Stylus.IsFlicksEnabled" Value="false"/>
@@ -548,7 +513,6 @@
                 </Style.Triggers>
             </Style>
 
-            <!-- ScrollViewer style to apply the custom scrollbar -->
             <Style TargetType="{x:Type ScrollViewer}">
                 <Setter Property="Template">
                     <Setter.Value>

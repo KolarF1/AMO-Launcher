@@ -20,7 +20,6 @@ namespace AMO_Launcher.Services
 {
     public class ModDetectionService
     {
-        // All fields are initialized directly at declaration - no need to assign in constructor
         private readonly string _modsBasePath = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,
             "Mods");
@@ -30,14 +29,10 @@ namespace AMO_Launcher.Services
 
         public ModDetectionService()
         {
-            // Initialize the default icon without depending on ReadOnly fields
             InitializeDefaultIcon();
-
-            // Perform error-handled initialization that doesn't modify readonly fields
             InitializeFolders();
         }
 
-        // Separating icon initialization for clarity
         private void InitializeDefaultIcon()
         {
             _defaultModIcon = ErrorHandler.ExecuteSafe<BitmapImage>(() =>
@@ -51,7 +46,7 @@ namespace AMO_Launcher.Services
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
                     bitmap.UriSource = new Uri("pack://application:,,,/AMO_Launcher;component/Resources/DefaultModIcon.png");
                     bitmap.EndInit();
-                    bitmap.Freeze(); // Make it thread safe
+                    bitmap.Freeze();
                     App.LogService.LogDebug("Default icon loaded successfully");
                     return bitmap;
                 }
@@ -64,7 +59,6 @@ namespace AMO_Launcher.Services
             }, "Loading default mod icon", false);
         }
 
-        // Separating folder initialization to avoid readonly field conflicts
         private void InitializeFolders()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -72,7 +66,6 @@ namespace AMO_Launcher.Services
                 App.LogService.Info("Initializing ModDetectionService");
                 App.LogService.LogDebug($"Mods base path set to: {_modsBasePath}");
 
-                // Ensure the Mods folder exists
                 if (!Directory.Exists(_modsBasePath))
                 {
                     App.LogService.LogDebug($"Creating Mods folder at {_modsBasePath}");
@@ -84,7 +77,6 @@ namespace AMO_Launcher.Services
             }, "ModDetectionService initialization");
         }
 
-        // Get or create the game-specific mods folder
         public string GetGameModsFolder(GameInfo game)
         {
             return ErrorHandler.ExecuteSafe<string>(() =>
@@ -95,12 +87,10 @@ namespace AMO_Launcher.Services
                     return null;
                 }
 
-                // Use game name as folder name (replace invalid chars)
                 string gameFolderName = string.Join("_", game.Name.Split(Path.GetInvalidFileNameChars()));
                 string gameModsPath = Path.Combine(_modsBasePath, gameFolderName);
                 App.LogService.LogDebug($"Game mods folder path: {gameModsPath}");
 
-                // Create the folder if it doesn't exist
                 if (!Directory.Exists(gameModsPath))
                 {
                     App.LogService.LogDebug($"Creating game mods folder at {gameModsPath}");
@@ -112,7 +102,6 @@ namespace AMO_Launcher.Services
             }, "Getting game mods folder", true, null);
         }
 
-        // Check if a file is a supported archive
         private bool IsArchiveFile(string filePath)
         {
             return ErrorHandler.ExecuteSafe<bool>(() =>
@@ -131,7 +120,6 @@ namespace AMO_Launcher.Services
             }, "Checking archive file", false, false);
         }
 
-        // Process archives in the game's mod folder without extracting
         private async Task ProcessArchivesAsync(string gameModsFolder, string gameName, List<ModInfo> mods)
         {
             await ErrorHandler.ExecuteSafeAsync(async () =>
@@ -156,10 +144,8 @@ namespace AMO_Launcher.Services
 
                     try
                     {
-                        // Create operation context for this archive
                         string archiveFileName = Path.GetFileName(archivePath);
 
-                        // Read the mod data from the archive
                         var mod = await LoadModFromArchivePathAsync(archivePath, gameName);
                         if (mod != null)
                         {
@@ -174,7 +160,6 @@ namespace AMO_Launcher.Services
                     }
                     catch (Exception ex)
                     {
-                        // Log but continue with next archive
                         App.LogService.Error($"Error processing archive {Path.GetFileName(archivePath)}: {ex.Message}");
                         App.LogService.LogDebug($"Archive error details: {ex}");
                     }
@@ -184,12 +169,10 @@ namespace AMO_Launcher.Services
             }, "Processing archive files");
         }
 
-        // Load mod from archive without extracting (accessible publicly)
         public async Task<ModInfo> LoadModFromArchivePathAsync(string archivePath, string currentGameName, string rootPath = null)
         {
             return await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                // Validate inputs
                 if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
                 {
                     App.LogService.Warning($"LoadModFromArchivePathAsync called with invalid path: {archivePath}");
@@ -213,13 +196,11 @@ namespace AMO_Launcher.Services
                         {
                             App.LogService.Trace($"Archive opened successfully: {archiveFileName} - {archive.Entries.Count()} entries");
 
-                            // Look for mod.json in the archive
                             var modJsonEntry = archive.Entries.FirstOrDefault(e =>
                                 Path.GetFileName(e.Key).Equals("mod.json", StringComparison.OrdinalIgnoreCase));
 
                             if (modJsonEntry == null)
                             {
-                                // Try to look in subdirectories
                                 modJsonEntry = archive.Entries.FirstOrDefault(e =>
                                     e.Key.EndsWith("/mod.json", StringComparison.OrdinalIgnoreCase) ||
                                     e.Key.EndsWith("\\mod.json", StringComparison.OrdinalIgnoreCase));
@@ -239,7 +220,6 @@ namespace AMO_Launcher.Services
                                 modJsonContent = reader.ReadToEnd();
                             }
 
-                            // Parse the mod.json content
                             var modData = ParseModJson(modJsonContent);
                             if (modData == null)
                             {
@@ -247,7 +227,6 @@ namespace AMO_Launcher.Services
                                 return null;
                             }
 
-                            // Skip this mod if it doesn't specify a game or doesn't match the current game
                             if (string.IsNullOrEmpty(modData.Game) ||
                                 !modData.Game.Equals(currentGameName, StringComparison.OrdinalIgnoreCase))
                             {
@@ -255,7 +234,6 @@ namespace AMO_Launcher.Services
                                 return null;
                             }
 
-                            // Get the parent directory of mod.json to determine the root path inside the archive
                             string modRootInArchive = rootPath;
                             if (string.IsNullOrEmpty(modRootInArchive))
                             {
@@ -268,7 +246,6 @@ namespace AMO_Launcher.Services
 
                             App.LogService.Trace($"Mod root in archive: {modRootInArchive}");
 
-                            // Create mod info
                             var modInfo = new ModInfo
                             {
                                 Name = string.IsNullOrEmpty(modData.Name) ? "Unknown Mod" : modData.Name,
@@ -284,7 +261,6 @@ namespace AMO_Launcher.Services
 
                             App.LogService.LogDebug($"Created ModInfo from archive: {modInfo.Name} v{modInfo.Version} by {modInfo.Author}");
 
-                            // Look for icon.png in the archive
                             var iconEntry = archive.Entries.FirstOrDefault(e =>
                                 Path.GetFileName(e.Key).Equals("icon.png", StringComparison.OrdinalIgnoreCase) &&
                                 Path.GetDirectoryName(e.Key)?.Replace('\\', '/') == modRootInArchive.TrimEnd('/'));
@@ -305,7 +281,7 @@ namespace AMO_Launcher.Services
                                         bitmap.CacheOption = BitmapCacheOption.OnLoad;
                                         bitmap.StreamSource = memoryStream;
                                         bitmap.EndInit();
-                                        bitmap.Freeze(); // Make it thread safe
+                                        bitmap.Freeze();
 
                                         modInfo.Icon = bitmap;
                                         App.LogService.Trace("Icon loaded successfully");
@@ -329,7 +305,6 @@ namespace AMO_Launcher.Services
                     }
                     catch (SharpCompress.Common.ArchiveException aex)
                     {
-                        // Specialized handling for archive format errors
                         App.LogService.Error($"Archive format error: {aex.Message}");
                         App.LogService.LogDebug($"Archive exception details: {aex}");
                         return null;
@@ -344,7 +319,6 @@ namespace AMO_Launcher.Services
             }, $"Loading mod from archive: {Path.GetFileName(archivePath)}", false);
         }
 
-        // Scan for mods for a specific game
         public async Task<List<ModInfo>> ScanForModsAsync(GameInfo game)
         {
             return await ErrorHandler.ExecuteSafeAsync(async () =>
@@ -356,7 +330,6 @@ namespace AMO_Launcher.Services
                     return mods;
                 }
 
-                // Start performance tracking
                 var startTime = DateTime.Now;
                 App.LogService.Info($"Starting mod scan for game: {game.Name}");
 
@@ -369,7 +342,6 @@ namespace AMO_Launcher.Services
 
                 App.LogService.LogDebug($"Scanning for mods in {gameModsFolder}");
 
-                // Process all subdirectories (each could be a mod)
                 var folderScanStopwatch = new System.Diagnostics.Stopwatch();
                 folderScanStopwatch.Start();
 
@@ -401,7 +373,6 @@ namespace AMO_Launcher.Services
                     }
                     catch (Exception ex)
                     {
-                        // Log error and continue with next mod
                         App.LogService.Error($"Error loading mod from {folderName}: {ex.Message}");
                         App.LogService.LogDebug($"Exception details: {ex}");
                     }
@@ -410,7 +381,6 @@ namespace AMO_Launcher.Services
                 folderScanStopwatch.Stop();
                 App.LogService.LogDebug($"Folder scan completed in {folderScanStopwatch.ElapsedMilliseconds}ms: {foldersSuccessful} of {modFolders.Length} folders contained valid mods");
 
-                // Process archive files without extracting
                 var archiveScanStopwatch = new System.Diagnostics.Stopwatch();
                 archiveScanStopwatch.Start();
 
@@ -419,11 +389,9 @@ namespace AMO_Launcher.Services
                 archiveScanStopwatch.Stop();
                 App.LogService.LogDebug($"Archive scan completed in {archiveScanStopwatch.ElapsedMilliseconds}ms");
 
-                // Calculate total elapsed time
                 var elapsed = DateTime.Now - startTime;
                 App.LogService.Info($"Mod scan complete for {game.Name}: Found {mods.Count} mods in {elapsed.TotalMilliseconds:F1}ms");
 
-                // Performance warning if scan takes too long
                 if (elapsed.TotalSeconds > 5)
                 {
                     App.LogService.Warning($"Mod scanning took longer than expected ({elapsed.TotalSeconds:F1} seconds). Consider optimizing the mod directory.");
@@ -433,12 +401,10 @@ namespace AMO_Launcher.Services
             }, $"Scanning for mods: {game?.Name ?? "unknown game"}", true, new List<ModInfo>());
         }
 
-        // Load a mod from a folder (accessible publicly)
         public ModInfo LoadModFromFolderPath(string folderPath, string currentGameName)
         {
             return ErrorHandler.ExecuteSafe<ModInfo>(() =>
             {
-                // Validate inputs
                 if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
                 {
                     App.LogService.Warning($"LoadModFromFolderPath called with invalid folder: {folderPath}");
@@ -454,7 +420,6 @@ namespace AMO_Launcher.Services
                 string folderName = Path.GetFileName(folderPath);
                 App.LogService.LogDebug($"Loading mod from folder: {folderName}");
 
-                // Check for mod.json file
                 string modJsonPath = Path.Combine(folderPath, "mod.json");
                 if (!File.Exists(modJsonPath))
                 {
@@ -464,7 +429,6 @@ namespace AMO_Launcher.Services
 
                 try
                 {
-                    // Parse mod.json
                     string jsonContent = File.ReadAllText(modJsonPath);
                     App.LogService.Trace("Read mod.json content");
 
@@ -475,7 +439,6 @@ namespace AMO_Launcher.Services
                         return null;
                     }
 
-                    // Skip this mod if it doesn't specify a game or doesn't match the current game
                     if (string.IsNullOrEmpty(modData.Game) ||
                         !modData.Game.Equals(currentGameName, StringComparison.OrdinalIgnoreCase))
                     {
@@ -483,7 +446,6 @@ namespace AMO_Launcher.Services
                         return null;
                     }
 
-                    // Create mod info
                     var modInfo = new ModInfo
                     {
                         Name = string.IsNullOrEmpty(modData.Name) ? "Unknown Mod" : modData.Name,
@@ -499,7 +461,6 @@ namespace AMO_Launcher.Services
 
                     App.LogService.LogDebug($"Created ModInfo from folder: {modInfo.Name} v{modInfo.Version} by {modInfo.Author}");
 
-                    // Load icon if exists
                     string iconPath = Path.Combine(folderPath, "icon.png");
                     if (File.Exists(iconPath))
                     {
@@ -523,7 +484,6 @@ namespace AMO_Launcher.Services
             }, $"Loading mod from folder: {Path.GetFileName(folderPath)}", false);
         }
 
-        // Load icon from file
         private BitmapImage LoadIconFromFile(string iconPath)
         {
             return ErrorHandler.ExecuteSafe<BitmapImage>(() =>
@@ -543,7 +503,7 @@ namespace AMO_Launcher.Services
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
                     bitmap.UriSource = new Uri(iconPath);
                     bitmap.EndInit();
-                    bitmap.Freeze(); // Make it thread safe
+                    bitmap.Freeze();
                     App.LogService.Trace("Icon loaded successfully");
                     return bitmap;
                 }
@@ -577,11 +537,9 @@ namespace AMO_Launcher.Services
                     App.LogService.Warning($"JSON parsing error: {ex.Message}");
                     App.LogService.LogDebug("Attempting to clean the JSON");
 
-                    // 1. Handle BOM and encoding issues by normalizing line endings
                     jsonContent = jsonContent.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
                     App.LogService.Trace("Normalized line endings");
 
-                    // 2. Handle trailing commas
                     string cleanedJson = System.Text.RegularExpressions.Regex.Replace(
                         jsonContent,
                         @",\s*([}\]])",
@@ -589,7 +547,6 @@ namespace AMO_Launcher.Services
                     );
                     App.LogService.Trace("Removed trailing commas");
 
-                    // 3. Remove any non-printable characters
                     cleanedJson = System.Text.RegularExpressions.Regex.Replace(
                         cleanedJson,
                         @"[\u0000-\u001F\u007F-\u009F]",
@@ -604,13 +561,11 @@ namespace AMO_Launcher.Services
                     }
                     catch (JsonReaderException innerEx)
                     {
-                        // 4. If all else fails, try a more aggressive approach - rewrite the entire JSON manually
                         App.LogService.Warning($"First cleanup failed: {innerEx.Message}");
                         App.LogService.LogDebug("Trying manual parsing with regex");
 
                         try
                         {
-                            // Extract values using simple regex patterns
                             var nameMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"name\"\\s*:\\s*\"([^\"]*)\"");
                             var descMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"description\"\\s*:\\s*\"([^\"]*)\"");
                             var versionMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"version\"\\s*:\\s*\"([^\"]*)\"");
@@ -618,12 +573,10 @@ namespace AMO_Launcher.Services
                             var gameMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"game\"\\s*:\\s*\"([^\"]*)\"");
                             var categoryMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, "\"category\"\\s*:\\s*\"([^\"]*)\"");
 
-                            // Log regex match results for debugging
                             App.LogService.Trace($"Regex matches - Name: {nameMatch.Success}, Description: {descMatch.Success}, " +
                                 $"Version: {versionMatch.Success}, Author: {authorMatch.Success}, " +
                                 $"Game: {gameMatch.Success}, Category: {categoryMatch.Success}");
 
-                            // Construct a clean JSON object
                             var modData = new ModData
                             {
                                 Name = nameMatch.Success ? nameMatch.Groups[1].Value : null,
@@ -641,7 +594,6 @@ namespace AMO_Launcher.Services
                         {
                             App.LogService.Error($"All JSON parsing attempts failed: {finalEx.Message}");
                             App.LogService.LogDebug($"Final exception details: {finalEx}");
-                            // Rethrow the original exception for better diagnostics
                             throw ex;
                         }
                     }
@@ -649,7 +601,6 @@ namespace AMO_Launcher.Services
             }, "Parsing mod.json", false);
         }
 
-        // Helper class for deserializing mod.json
         private class ModData
         {
             [JsonProperty("name")]

@@ -24,19 +24,16 @@ namespace AMO_Launcher.Services
             {
                 App.LogService?.LogDebug("Initializing ConfigurationService");
 
-                // Store config in AppData
                 string appDataPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "AMO_Launcher");
 
-                // Create directory if it doesn't exist
                 if (!Directory.Exists(appDataPath))
                 {
                     App.LogService?.LogDebug($"Creating application data directory: {appDataPath}");
                     Directory.CreateDirectory(appDataPath);
                 }
 
-                // Create icons folder if it doesn't exist
                 _iconCacheFolderPath = Path.Combine(appDataPath, "IconCache");
                 if (!Directory.Exists(_iconCacheFolderPath))
                 {
@@ -47,16 +44,14 @@ namespace AMO_Launcher.Services
                 _configFilePath = Path.Combine(appDataPath, "settings.json");
                 App.LogService?.LogDebug($"Config file path set to: {_configFilePath}");
 
-                // Initialize with default settings
                 _currentSettings = new AppSettings
                 {
                     Games = new List<GameSetting>(),
-                    RemovedGamePaths = new List<string>(), // Track removed games
+                    RemovedGamePaths = new List<string>(),
                     DefaultGameId = null,
                     LastGameId = null,
                     AppliedMods = new Dictionary<string, List<AppliedModSetting>>(),
                     LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>(),
-                    // Use case-insensitive dictionary to prevent key mismatches
                     GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase),
                     ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 };
@@ -67,11 +62,10 @@ namespace AMO_Launcher.Services
             {
                 App.LogService?.Error($"Failed to initialize ConfigurationService: {ex.Message}");
                 App.LogService?.LogDebug($"Exception details: {ex}");
-                throw; // Rethrow to let the application handle a critical initialization failure
+                throw;
             }
         }
 
-        // Load the settings from disk
         public async Task<AppSettings> LoadSettingsAsync()
         {
             return await ErrorHandler.ExecuteSafeAsync(async () =>
@@ -88,28 +82,24 @@ namespace AMO_Launcher.Services
                         var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
                         App.LogService?.LogDebug("Settings deserialized successfully");
 
-                        // Ensure the RemovedGamePaths list exists
                         if (loadedSettings.RemovedGamePaths == null)
                         {
                             App.LogService?.LogDebug("Initializing missing RemovedGamePaths collection");
                             loadedSettings.RemovedGamePaths = new List<string>();
                         }
 
-                        // Ensure the AppliedMods dictionary exists
                         if (loadedSettings.AppliedMods == null)
                         {
                             App.LogService?.LogDebug("Initializing missing AppliedMods dictionary");
                             loadedSettings.AppliedMods = new Dictionary<string, List<AppliedModSetting>>();
                         }
 
-                        // Ensure the LastAppliedMods dictionary exists
                         if (loadedSettings.LastAppliedMods == null)
                         {
                             App.LogService?.LogDebug("Initializing missing LastAppliedMods dictionary");
                             loadedSettings.LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>();
                         }
 
-                        // Ensure the GameProfiles dictionary exists and is case-insensitive
                         if (loadedSettings.GameProfiles == null)
                         {
                             App.LogService?.LogDebug("Initializing missing GameProfiles dictionary");
@@ -117,7 +107,6 @@ namespace AMO_Launcher.Services
                         }
                         else if (!(loadedSettings.GameProfiles is Dictionary<string, List<ModProfile>>))
                         {
-                            // Copy to a case-insensitive dictionary if it's not already one
                             App.LogService?.LogDebug("Converting GameProfiles to case-insensitive dictionary");
                             var newDict = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
                             foreach (var entry in loadedSettings.GameProfiles)
@@ -127,7 +116,6 @@ namespace AMO_Launcher.Services
                             loadedSettings.GameProfiles = newDict;
                         }
 
-                        // Ensure the ActiveProfileIds dictionary exists and is case-insensitive
                         if (loadedSettings.ActiveProfileIds == null)
                         {
                             App.LogService?.LogDebug("Initializing missing ActiveProfileIds dictionary");
@@ -135,7 +123,6 @@ namespace AMO_Launcher.Services
                         }
                         else if (!(loadedSettings.ActiveProfileIds is Dictionary<string, string>))
                         {
-                            // Copy to a case-insensitive dictionary if it's not already one
                             App.LogService?.LogDebug("Converting ActiveProfileIds to case-insensitive dictionary");
                             var newDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                             foreach (var entry in loadedSettings.ActiveProfileIds)
@@ -148,7 +135,6 @@ namespace AMO_Launcher.Services
                         _currentSettings = loadedSettings;
                         App.LogService?.Info("Settings loaded successfully");
 
-                        // Load icons from disk for all games
                         App.LogService?.LogDebug("Loading icons for manually added games");
                         int iconCount = 0;
                         int failedIcons = 0;
@@ -185,7 +171,6 @@ namespace AMO_Launcher.Services
                         App.LogService?.Error($"Error reading settings file: {ex.Message}");
                         App.LogService?.LogDebug($"Will attempt to load from backup or create new settings file");
 
-                        // Try loading from backup first
                         bool backupLoaded = false;
                         try
                         {
@@ -201,25 +186,23 @@ namespace AMO_Launcher.Services
                             App.LogService?.Error($"Failed to load from backup: {backupEx.Message}");
                         }
 
-                        // If backup load failed, create new settings file
                         if (!backupLoaded)
                         {
                             App.LogService?.Info("Creating new settings file with defaults");
-                            await SaveSettingsAsync(); // Save current default settings
+                            await SaveSettingsAsync();
                         }
                     }
                 }
                 else
                 {
                     App.LogService?.Info("Settings file not found, creating with default settings");
-                    await SaveSettingsAsync(); // Save current default settings to create the file
+                    await SaveSettingsAsync();
                 }
 
                 return _currentSettings;
             }, "LoadSettingsAsync", true, _currentSettings);
         }
 
-        // Save the current settings to disk
         public async Task SaveSettingsAsync()
         {
             await ErrorHandler.ExecuteSafeAsync(async () =>
@@ -229,10 +212,8 @@ namespace AMO_Launcher.Services
 
                 try
                 {
-                    // Wait to acquire the semaphore
                     await _fileSemaphore.WaitAsync();
 
-                    // Create a backup before saving
                     BackupSettingsFile();
 
                     string json = JsonSerializer.Serialize(_currentSettings, new JsonSerializerOptions
@@ -240,7 +221,6 @@ namespace AMO_Launcher.Services
                         WriteIndented = true
                     });
 
-                    // Use FileShare.Read to allow reading but prevent other writes
                     using (var fileStream = new FileStream(_configFilePath, FileMode.Create, FileAccess.Write, FileShare.Read))
                     using (var writer = new StreamWriter(fileStream))
                     {
@@ -250,7 +230,6 @@ namespace AMO_Launcher.Services
 
                     App.LogService?.LogDebug($"Settings saved to: {_configFilePath}");
 
-                    // Save icons for manually added games
                     int iconCount = 0;
                     int failedIcons = 0;
 
@@ -261,7 +240,6 @@ namespace AMO_Launcher.Services
                         {
                             try
                             {
-                                // Try to get the icon from the cache and save it
                                 var icon = App.IconCacheService.GetIcon(game.ExecutablePath);
                                 if (icon != null)
                                 {
@@ -281,7 +259,6 @@ namespace AMO_Launcher.Services
 
                     App.LogService?.LogDebug($"Icon saving complete - saved {iconCount} icons, {failedIcons} failed");
 
-                    // Calculate elapsed time
                     var elapsed = DateTime.Now - startTime;
                     App.LogService?.LogDebug($"SaveSettingsAsync completed in {elapsed.TotalMilliseconds:F1}ms");
 
@@ -289,13 +266,11 @@ namespace AMO_Launcher.Services
                 }
                 finally
                 {
-                    // Always release the semaphore
                     _fileSemaphore.Release();
                 }
             }, "SaveSettingsAsync");
         }
 
-        // Update the games list
         public void UpdateGames(List<GameInfo> games)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -308,7 +283,6 @@ namespace AMO_Launcher.Services
 
                 App.LogService?.Info($"Updating games list with {games.Count} games");
 
-                // Convert GameInfo objects to GameSetting objects for storage
                 _currentSettings.Games = new List<GameSetting>();
                 string defaultGameId = null;
 
@@ -332,7 +306,6 @@ namespace AMO_Launcher.Services
                         IsManuallyAdded = game.IsManuallyAdded
                     });
 
-                    // If this is marked as default, update the default game ID
                     if (game.IsDefault)
                     {
                         defaultGameId = game.Id;
@@ -345,7 +318,6 @@ namespace AMO_Launcher.Services
             }, "UpdateGames");
         }
 
-        // Generate a path for storing the icon on disk
         private string GetIconFilePath(string executablePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -364,7 +336,6 @@ namespace AMO_Launcher.Services
             }, "GetIconFilePath", false, null);
         }
 
-        // Convert a path to a safe filename
         private string GetSafeFileName(string path)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -375,7 +346,6 @@ namespace AMO_Launcher.Services
                     return "unknown";
                 }
 
-                // Create a hash of the path to use as a unique filename
                 using (var md5 = System.Security.Cryptography.MD5.Create())
                 {
                     byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(path);
@@ -388,7 +358,6 @@ namespace AMO_Launcher.Services
             }, "GetSafeFileName", false, "unknown");
         }
 
-        // Save an icon to disk
         private void SaveIconToDisk(string executablePath, BitmapImage icon)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -408,7 +377,6 @@ namespace AMO_Launcher.Services
                 string iconPath = GetIconFilePath(executablePath);
                 App.LogService?.LogDebug($"Saving icon for {executablePath} to {iconPath}");
 
-                // Convert BitmapImage to a PNG file
                 BitmapEncoder encoder = new PngBitmapEncoder();
                 encoder.Frames.Add(BitmapFrame.Create(icon));
 
@@ -421,7 +389,6 @@ namespace AMO_Launcher.Services
             }, "SaveIconToDisk");
         }
 
-        // Load an icon from disk and cache it
         private void LoadAndCacheIconFromDisk(string executablePath)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -447,15 +414,13 @@ namespace AMO_Launcher.Services
                 icon.CacheOption = BitmapCacheOption.OnLoad;
                 icon.UriSource = new Uri(iconPath, UriKind.Absolute);
                 icon.EndInit();
-                icon.Freeze(); // Make it thread-safe
+                icon.Freeze();
 
-                // Add to the application-wide cache
                 App.IconCacheService.AddToCache(executablePath, icon);
                 App.LogService?.LogDebug("Icon loaded and cached successfully");
             }, "LoadAndCacheIconFromDisk");
         }
 
-        // Add a game to the removed list
         public void AddToRemovedGames(string executablePath)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -478,7 +443,6 @@ namespace AMO_Launcher.Services
             }, "AddToRemovedGames");
         }
 
-        // Check if a game is in the removed list
         public bool IsGameRemoved(string executablePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -495,7 +459,6 @@ namespace AMO_Launcher.Services
             }, "IsGameRemoved", false, false);
         }
 
-        // Remove a game from the removed list (if the user wants to add it back)
         public void RemoveFromRemovedGames(string executablePath)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -518,7 +481,6 @@ namespace AMO_Launcher.Services
             }, "RemoveFromRemovedGames");
         }
 
-        // Set a game as the default
         public void SetDefaultGame(string gameId)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -526,7 +488,6 @@ namespace AMO_Launcher.Services
                 App.LogService?.Info($"Setting default game to: {gameId ?? "None"}");
                 _currentSettings.DefaultGameId = gameId;
 
-                // If gameId is null, clear default
                 if (gameId == null)
                 {
                     foreach (var game in _currentSettings.Games)
@@ -537,7 +498,6 @@ namespace AMO_Launcher.Services
                     return;
                 }
 
-                // Update the IsDefault flag on all games
                 foreach (var game in _currentSettings.Games)
                 {
                     bool wasDefault = game.IsDefault;
@@ -551,7 +511,6 @@ namespace AMO_Launcher.Services
             }, "SetDefaultGame");
         }
 
-        // Set the last selected game
         public void SetLastSelectedGame(string gameId)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -561,25 +520,21 @@ namespace AMO_Launcher.Services
             }, "SetLastSelectedGame");
         }
 
-        // Get the default or last used game ID
         public string GetPreferredGameId()
         {
             return ErrorHandler.ExecuteSafe(() =>
             {
-                // Prefer default game if set
                 if (!string.IsNullOrEmpty(_currentSettings.DefaultGameId))
                 {
                     App.LogService?.Trace($"Using default game ID: {_currentSettings.DefaultGameId}");
                     return _currentSettings.DefaultGameId;
                 }
 
-                // Fall back to last selected game
                 App.LogService?.Trace($"Using last selected game ID: {_currentSettings.LastGameId ?? "None"}");
                 return _currentSettings.LastGameId;
             }, "GetPreferredGameId", false, null);
         }
 
-        // Get the list of removed game paths
         public List<string> GetRemovedGamePaths()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -590,7 +545,6 @@ namespace AMO_Launcher.Services
             }, "GetRemovedGamePaths", false, new List<string>());
         }
 
-        // Save applied mods for a specific game
         public async Task SaveAppliedModsAsync(string gameId, List<AppliedModSetting> appliedMods)
         {
             await ErrorHandler.ExecuteSafeAsync(async () =>
@@ -612,13 +566,11 @@ namespace AMO_Launcher.Services
                 _currentSettings.AppliedMods = _currentSettings.AppliedMods ?? new Dictionary<string, List<AppliedModSetting>>();
                 _currentSettings.AppliedMods[gameId] = appliedMods;
 
-                // Save settings asynchronously
                 await SaveSettingsAsync();
                 App.LogService?.LogDebug("Applied mods saved successfully");
             }, "SaveAppliedModsAsync");
         }
 
-        // Non-async wrapper for backwards compatibility
         public void SaveAppliedMods(string gameId, List<AppliedModSetting> appliedMods)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -640,13 +592,11 @@ namespace AMO_Launcher.Services
                 _currentSettings.AppliedMods = _currentSettings.AppliedMods ?? new Dictionary<string, List<AppliedModSetting>>();
                 _currentSettings.AppliedMods[gameId] = appliedMods;
 
-                // Use Task.Run to prevent blocking
                 Task.Run(() => SaveSettingsAsync()).ConfigureAwait(false);
                 App.LogService?.LogDebug("Initiated background save of applied mods");
             }, "SaveAppliedMods");
         }
 
-        // Save the last applied mods state
         public async Task SaveLastAppliedModsStateAsync(string gameId, List<AppliedModSetting> appliedMods)
         {
             await ErrorHandler.ExecuteSafeAsync(async () =>
@@ -668,13 +618,11 @@ namespace AMO_Launcher.Services
                 _currentSettings.LastAppliedMods = _currentSettings.LastAppliedMods ?? new Dictionary<string, List<AppliedModSetting>>();
                 _currentSettings.LastAppliedMods[gameId] = appliedMods;
 
-                // Save settings asynchronously
                 await SaveSettingsAsync();
                 App.LogService?.LogDebug("Last applied mods state saved successfully");
             }, "SaveLastAppliedModsStateAsync");
         }
 
-        // Non-async wrapper
         public void SaveLastAppliedModsState(string gameId, List<AppliedModSetting> appliedMods)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -696,14 +644,11 @@ namespace AMO_Launcher.Services
                 _currentSettings.LastAppliedMods = _currentSettings.LastAppliedMods ?? new Dictionary<string, List<AppliedModSetting>>();
                 _currentSettings.LastAppliedMods[gameId] = appliedMods;
 
-                // DON'T use Task.Run - this creates a fire-and-forget operation that's not tracked
-                // Instead, use a synchronous save to ensure it completes
                 try
                 {
                     var startTime = DateTime.Now;
                     App.LogService?.LogDebug("Performing synchronous save of last applied mods state");
 
-                    // Create a backup before saving
                     BackupSettingsFile();
 
                     string json = JsonSerializer.Serialize(_currentSettings, new JsonSerializerOptions
@@ -721,12 +666,11 @@ namespace AMO_Launcher.Services
                 {
                     App.LogService?.Error($"Error saving settings: {ex.Message}");
                     App.LogService?.LogDebug($"Save error details: {ex}");
-                    throw; // Rethrow for the ErrorHandler to catch
+                    throw;
                 }
             }, "SaveLastAppliedModsState");
         }
 
-        // Get applied mods for a specific game
         public List<AppliedModSetting> GetAppliedMods(string gameId)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -750,7 +694,6 @@ namespace AMO_Launcher.Services
             }, "GetAppliedMods", false, new List<AppliedModSetting>());
         }
 
-        // Get the last applied mods state
         public List<AppliedModSetting> GetLastAppliedModsState(string gameId)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -774,10 +717,8 @@ namespace AMO_Launcher.Services
             }, "GetLastAppliedModsState", false, null);
         }
 
-        // Flag to track if mods have been changed
         private bool _modsChanged = false;
 
-        // Mark mods as changed
         public void MarkModsChanged()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -787,7 +728,6 @@ namespace AMO_Launcher.Services
             }, "MarkModsChanged");
         }
 
-        // Reset the mods changed flag
         public void ResetModsChangedFlag()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -797,7 +737,6 @@ namespace AMO_Launcher.Services
             }, "ResetModsChangedFlag");
         }
 
-        // Check if mods have changed since last application
         public bool HaveModsChanged(string gameId, List<AppliedModSetting> currentActiveMods)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -805,16 +744,15 @@ namespace AMO_Launcher.Services
                 if (string.IsNullOrEmpty(gameId))
                 {
                     App.LogService?.LogDebug("HaveModsChanged called with null or empty gameId");
-                    return true; // Consider changed if we don't know the game
+                    return true;
                 }
 
                 if (currentActiveMods == null)
                 {
                     App.LogService?.LogDebug("HaveModsChanged called with null currentActiveMods");
-                    return true; // Consider changed if no mods provided
+                    return true;
                 }
 
-                // Debug which condition is triggering
                 if (_modsChanged)
                 {
                     App.LogService?.LogDebug("Mods have changed because flag is explicitly set");
@@ -823,34 +761,29 @@ namespace AMO_Launcher.Services
 
                 var lastAppliedState = GetLastAppliedModsState(gameId);
 
-                // If no last state exists at all, then mods have changed
                 if (lastAppliedState == null)
                 {
                     App.LogService?.LogDebug("Mods have changed because last state is null");
                     return true;
                 }
 
-                // If both current and last state have 0 mods, nothing changed
                 if (lastAppliedState.Count == 0 && currentActiveMods.Count == 0)
                 {
                     App.LogService?.LogDebug("No changes: both current and last state have 0 mods");
                     return false;
                 }
 
-                // If counts differ, something changed
                 if (lastAppliedState.Count != currentActiveMods.Count)
                 {
                     App.LogService?.LogDebug($"Mods have changed: count mismatch (current: {currentActiveMods.Count}, last: {lastAppliedState.Count})");
                     return true;
                 }
 
-                // Check if each mod in current state matches last state
                 for (int i = 0; i < currentActiveMods.Count; i++)
                 {
                     var currentMod = currentActiveMods[i];
                     var lastMod = lastAppliedState[i];
 
-                    // If different mod or different order, mods have changed
                     if (currentMod.ModFolderPath != lastMod.ModFolderPath ||
                         currentMod.IsFromArchive != lastMod.IsFromArchive ||
                         currentMod.ArchiveSource != lastMod.ArchiveSource ||
@@ -863,7 +796,6 @@ namespace AMO_Launcher.Services
                     }
                 }
 
-                // No differences found
                 App.LogService?.LogDebug("No mod changes detected");
                 return false;
             }, "HaveModsChanged", false, true);
@@ -889,24 +821,20 @@ namespace AMO_Launcher.Services
 
                 App.LogService?.Info($"Saving {profiles.Count} profiles for game {gameId}");
 
-                // Make sure settings object exists
                 if (_currentSettings == null)
                 {
                     App.LogService?.LogDebug("Settings object is null, loading settings first");
                     await LoadSettingsAsync();
                 }
 
-                // Ensure the game profiles dictionary exists
                 if (_currentSettings.GameProfiles == null)
                 {
                     App.LogService?.LogDebug("Initializing missing GameProfiles dictionary");
                     _currentSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
                 }
 
-                // Create a backup of the profiles before saving
                 BackupSettingsFile();
 
-                // Filter out any null profiles
                 var originalCount = profiles.Count;
                 var validProfiles = profiles.Where(p => p != null).ToList();
 
@@ -915,10 +843,8 @@ namespace AMO_Launcher.Services
                     App.LogService?.Warning($"Filtered out {originalCount - validProfiles.Count} null profiles");
                 }
 
-                // Save the profiles
                 _currentSettings.GameProfiles[gameId] = validProfiles;
 
-                // Save settings to disk
                 await SaveSettingsAsync();
 
                 var elapsed = DateTime.Now - startTime;
@@ -945,24 +871,20 @@ namespace AMO_Launcher.Services
 
                 App.LogService?.Info($"Saving active profile ID {profileId} for game {gameId}");
 
-                // Make sure settings object exists
                 if (_currentSettings == null)
                 {
                     App.LogService?.LogDebug("Settings object is null, loading settings first");
                     await LoadSettingsAsync();
                 }
 
-                // Ensure the active profiles dictionary exists
                 if (_currentSettings.ActiveProfileIds == null)
                 {
                     App.LogService?.LogDebug("Initializing missing ActiveProfileIds dictionary");
                     _currentSettings.ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 }
 
-                // Save the active profile ID
                 _currentSettings.ActiveProfileIds[gameId] = profileId;
 
-                // Save settings to disk
                 await SaveSettingsAsync();
 
                 App.LogService?.Info($"Active profile ID saved successfully");
@@ -973,21 +895,18 @@ namespace AMO_Launcher.Services
         {
             return await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                // Make sure settings object exists
                 if (_currentSettings == null)
                 {
                     App.LogService?.LogDebug("Settings object is null, loading settings first");
                     await LoadSettingsAsync();
                 }
 
-                // Return empty list if no profiles exist
                 if (_currentSettings.GameProfiles == null)
                 {
                     App.LogService?.LogDebug("GameProfiles dictionary is null, returning empty list");
                     return new List<string>();
                 }
 
-                // Return all game IDs with profiles
                 var gameIds = new List<string>(_currentSettings.GameProfiles.Keys);
                 App.LogService?.LogDebug($"Retrieved {gameIds.Count} game IDs with profiles");
 
@@ -1007,21 +926,18 @@ namespace AMO_Launcher.Services
 
                 App.LogService?.Info($"Loading profiles for game {gameId}");
 
-                // Make sure settings object exists
                 if (_currentSettings == null)
                 {
                     App.LogService?.LogDebug("Settings object is null, loading settings first");
                     await LoadSettingsAsync();
                 }
 
-                // Initialize if needed
                 if (_currentSettings.GameProfiles == null)
                 {
                     App.LogService?.LogDebug("Initializing missing GameProfiles dictionary");
                     _currentSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
                 }
 
-                // Log all available game IDs for debugging
                 if (App.LogService?.ShouldLogDebug() == true)
                 {
                     App.LogService.LogDebug("Available game IDs in settings:");
@@ -1031,7 +947,6 @@ namespace AMO_Launcher.Services
                     }
                 }
 
-                // Find profiles for the game
                 List<ModProfile> profiles = null;
 
                 if (_currentSettings.GameProfiles.TryGetValue(gameId, out profiles))
@@ -1040,11 +955,9 @@ namespace AMO_Launcher.Services
                     return profiles;
                 }
 
-                // Enhanced fuzzy matching - try just the game name
                 string gameName = gameId.Split('_')[0];
                 App.LogService?.LogDebug($"Exact match not found, trying fuzzy match with game name: {gameName}");
 
-                // Try to find any key that starts with the game name
                 var matchingKey = _currentSettings.GameProfiles.Keys
                     .FirstOrDefault(k => k.StartsWith(gameName, StringComparison.OrdinalIgnoreCase));
 
@@ -1053,14 +966,12 @@ namespace AMO_Launcher.Services
                     profiles = _currentSettings.GameProfiles[matchingKey];
                     App.LogService?.Info($"Found {profiles.Count} profiles using fuzzy match: {matchingKey}");
 
-                    // Store with new ID to avoid future mismatches
                     _currentSettings.GameProfiles[gameId] = profiles;
                     await SaveSettingsAsync();
 
                     return profiles;
                 }
 
-                // If no profiles found at all, return empty list
                 App.LogService?.Info($"No profiles found for game {gameId}, returning empty list");
                 return new List<ModProfile>();
             }, "LoadProfilesAsync", true, new List<ModProfile>());
@@ -1076,14 +987,12 @@ namespace AMO_Launcher.Services
                     return null;
                 }
 
-                // Make sure settings object exists
                 if (_currentSettings == null)
                 {
                     App.LogService?.LogDebug("Settings object is null, loading settings first");
                     await LoadSettingsAsync();
                 }
 
-                // Return null if no active profile ID exists
                 if (_currentSettings.ActiveProfileIds == null)
                 {
                     App.LogService?.LogDebug("ActiveProfileIds dictionary is null");
@@ -1096,7 +1005,6 @@ namespace AMO_Launcher.Services
                     return null;
                 }
 
-                // Return the active profile ID
                 var profileId = _currentSettings.ActiveProfileIds[gameId];
                 App.LogService?.LogDebug($"Retrieved active profile ID for game {gameId}: {profileId}");
                 return profileId;
@@ -1115,14 +1023,12 @@ namespace AMO_Launcher.Services
 
                 App.LogService?.LogDebug($"GetProfiles: Looking for profiles with game ID: {gameId}");
 
-                // Ensure dictionaries are initialized
                 if (_currentSettings.GameProfiles == null)
                 {
                     App.LogService?.LogDebug("Initializing missing GameProfiles dictionary");
                     _currentSettings.GameProfiles = new Dictionary<string, List<ModProfile>>(StringComparer.OrdinalIgnoreCase);
                 }
 
-                // Log all available game IDs for debugging
                 if (App.LogService?.ShouldLogDebug() == true)
                 {
                     App.LogService.LogDebug("Available profile game IDs:");
@@ -1132,26 +1038,22 @@ namespace AMO_Launcher.Services
                     }
                 }
 
-                // Check if there are profiles for this exact game ID
                 if (_currentSettings.GameProfiles.TryGetValue(gameId, out var exactProfiles))
                 {
                     App.LogService?.Info($"Found {exactProfiles.Count} profiles with exact ID match");
                     return exactProfiles;
                 }
 
-                // If not found with the exact ID, try to match by game name portion
-                string gameName = gameId.Split('_')[0]; // Extract name part before underscore
+                string gameName = gameId.Split('_')[0];
                 App.LogService?.LogDebug($"Trying partial match with game name: {gameName}");
 
                 foreach (var entry in _currentSettings.GameProfiles)
                 {
-                    // Check if the key starts with the game name
                     if (entry.Key.StartsWith(gameName + "_", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(entry.Key, gameName, StringComparison.OrdinalIgnoreCase))
                     {
                         App.LogService?.Info($"Found {entry.Value.Count} profiles using partial name match: {entry.Key}");
 
-                        // Save with new ID to prevent future mismatches
                         _currentSettings.GameProfiles[gameId] = entry.Value;
                         Task.Run(() => SaveSettingsAsync());
 
@@ -1159,7 +1061,6 @@ namespace AMO_Launcher.Services
                     }
                 }
 
-                // No profiles found - create a default one
                 App.LogService?.Info($"No profiles found for game {gameId}, creating default profile");
                 var defaultProfile = new ModProfile
                 {
@@ -1171,7 +1072,6 @@ namespace AMO_Launcher.Services
                 var newList = new List<ModProfile> { defaultProfile };
                 _currentSettings.GameProfiles[gameId] = newList;
 
-                // Save in background to avoid blocking
                 Task.Run(() => SaveSettingsAsync());
 
                 return newList;
@@ -1213,7 +1113,6 @@ namespace AMO_Launcher.Services
                 string json = await File.ReadAllTextAsync(backupPath);
                 var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
 
-                // Initialize required collections
                 if (loadedSettings.RemovedGamePaths == null)
                 {
                     App.LogService?.LogDebug("Initializing missing RemovedGamePaths collection in backup");
@@ -1247,14 +1146,12 @@ namespace AMO_Launcher.Services
                 _currentSettings = loadedSettings;
                 App.LogService?.Info("Successfully loaded settings from backup file");
 
-                // Save to main file to repair it
                 await SaveSettingsAsync();
 
                 return _currentSettings;
             }, "TryLoadFromBackupAsync", true, _currentSettings);
         }
 
-        // Get auto-detect games at startup setting
         public bool GetAutoDetectGamesAtStartup()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1262,10 +1159,9 @@ namespace AMO_Launcher.Services
                 bool result = _currentSettings.AutoDetectGamesAtStartup;
                 App.LogService?.Trace($"GetAutoDetectGamesAtStartup: {result}");
                 return result;
-            }, "GetAutoDetectGamesAtStartup", false, true); // Default to true if error
+            }, "GetAutoDetectGamesAtStartup", false, true);
         }
 
-        // Set auto-detect games at startup setting
         public void SetAutoDetectGamesAtStartup(bool value)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1275,7 +1171,6 @@ namespace AMO_Launcher.Services
             }, "SetAutoDetectGamesAtStartup");
         }
 
-        // Get auto-check for updates at startup setting
         public bool GetAutoCheckForUpdatesAtStartup()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1283,10 +1178,9 @@ namespace AMO_Launcher.Services
                 bool result = _currentSettings.AutoCheckForUpdatesAtStartup;
                 App.LogService?.Trace($"GetAutoCheckForUpdatesAtStartup: {result}");
                 return result;
-            }, "GetAutoCheckForUpdatesAtStartup", false, true); // Default to true if error
+            }, "GetAutoCheckForUpdatesAtStartup", false, true);
         }
 
-        // Set auto-check for updates at startup setting
         public void SetAutoCheckForUpdatesAtStartup(bool value)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1296,7 +1190,6 @@ namespace AMO_Launcher.Services
             }, "SetAutoCheckForUpdatesAtStartup");
         }
 
-        // Get detailed logging setting
         public bool GetEnableDetailedLogging()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1304,10 +1197,9 @@ namespace AMO_Launcher.Services
                 bool result = _currentSettings.EnableDetailedLogging;
                 App.LogService?.Trace($"GetEnableDetailedLogging: {result}");
                 return result;
-            }, "GetEnableDetailedLogging", false, false); // Default to false if error
+            }, "GetEnableDetailedLogging", false, false);
         }
 
-        // Set detailed logging setting
         public void SetEnableDetailedLogging(bool value)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1315,7 +1207,6 @@ namespace AMO_Launcher.Services
                 App.LogService?.Info($"Setting EnableDetailedLogging to {value}");
                 _currentSettings.EnableDetailedLogging = value;
 
-                // Update the log service as well if available
                 if (App.LogService != null)
                 {
                     App.LogService.UpdateDetailedLogging(value);
@@ -1323,7 +1214,6 @@ namespace AMO_Launcher.Services
             }, "SetEnableDetailedLogging");
         }
 
-        // Get low usage mode setting
         public bool GetLowUsageMode()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1331,10 +1221,9 @@ namespace AMO_Launcher.Services
                 bool result = _currentSettings.LowUsageMode;
                 App.LogService?.Trace($"GetLowUsageMode: {result}");
                 return result;
-            }, "GetLowUsageMode", false, false); // Default to false if error
+            }, "GetLowUsageMode", false, false);
         }
 
-        // Set low usage mode setting
         public void SetLowUsageMode(bool value)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1344,7 +1233,6 @@ namespace AMO_Launcher.Services
             }, "SetLowUsageMode");
         }
 
-        // Get remember last selected game setting
         public bool GetRememberLastSelectedGame()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1352,10 +1240,9 @@ namespace AMO_Launcher.Services
                 bool result = _currentSettings.RememberLastSelectedGame;
                 App.LogService?.Trace($"GetRememberLastSelectedGame: {result}");
                 return result;
-            }, "GetRememberLastSelectedGame", false, false); // Default to false if error
+            }, "GetRememberLastSelectedGame", false, false);
         }
 
-        // Set remember last selected game setting
         public void SetRememberLastSelectedGame(bool value)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1365,7 +1252,6 @@ namespace AMO_Launcher.Services
             }, "SetRememberLastSelectedGame");
         }
 
-        // Get launcher action on game launch
         public string GetLauncherActionOnGameLaunch()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1373,15 +1259,13 @@ namespace AMO_Launcher.Services
                 string result = _currentSettings.LauncherActionOnGameLaunch ?? "Minimize";
                 App.LogService?.Trace($"GetLauncherActionOnGameLaunch: {result}");
                 return result;
-            }, "GetLauncherActionOnGameLaunch", false, "Minimize"); // Default to Minimize if error
+            }, "GetLauncherActionOnGameLaunch", false, "Minimize");
         }
 
-        // Set launcher action on game launch
         public void SetLauncherActionOnGameLaunch(string value)
         {
             ErrorHandler.ExecuteSafe(() =>
             {
-                // Validate the value
                 if (string.IsNullOrEmpty(value) ||
                     (value != "None" && value != "Minimize" && value != "Close"))
                 {
@@ -1394,7 +1278,6 @@ namespace AMO_Launcher.Services
             }, "SetLauncherActionOnGameLaunch");
         }
 
-        // Get custom game scan paths
         public List<string> GetCustomGameScanPaths()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1405,7 +1288,6 @@ namespace AMO_Launcher.Services
             }, "GetCustomGameScanPaths", false, new List<string>());
         }
 
-        // Add custom game scan path
         public void AddCustomGameScanPath(string path)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1418,7 +1300,6 @@ namespace AMO_Launcher.Services
 
                 _currentSettings.CustomGameScanPaths = _currentSettings.CustomGameScanPaths ?? new List<string>();
 
-                // Don't add duplicates
                 if (!_currentSettings.CustomGameScanPaths.Contains(path))
                 {
                     _currentSettings.CustomGameScanPaths.Add(path);
@@ -1431,7 +1312,6 @@ namespace AMO_Launcher.Services
             }, "AddCustomGameScanPath");
         }
 
-        // Remove custom game scan path
         public void RemoveCustomGameScanPath(string path)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1460,7 +1340,6 @@ namespace AMO_Launcher.Services
             }, "RemoveCustomGameScanPath");
         }
 
-        // Clear all custom game scan paths
         public void ClearCustomGameScanPaths()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1470,7 +1349,6 @@ namespace AMO_Launcher.Services
             }, "ClearCustomGameScanPaths");
         }
 
-        // Reset to default settings
         public async Task ResetToDefaultSettingsAsync()
         {
             await ErrorHandler.ExecuteSafeAsync(async () =>
@@ -1478,20 +1356,17 @@ namespace AMO_Launcher.Services
                 App.LogService?.Info("Resetting to default settings");
                 var startTime = DateTime.Now;
 
-                // Save existing Games and GameProfiles data
                 var existingGames = _currentSettings.Games;
                 var existingProfiles = _currentSettings.GameProfiles;
                 var existingRemovedPaths = _currentSettings.RemovedGamePaths;
 
-                // Create a backup before resetting
                 BackupSettingsFile();
 
-                // Create a new settings object with defaults
                 _currentSettings = new AppSettings
                 {
-                    Games = existingGames, // Keep game data
-                    GameProfiles = existingProfiles, // Keep profiles data
-                    RemovedGamePaths = existingRemovedPaths, // Keep removed paths
+                    Games = existingGames,
+                    GameProfiles = existingProfiles,
+                    RemovedGamePaths = existingRemovedPaths,
                     AppliedMods = new Dictionary<string, List<AppliedModSetting>>(),
                     LastAppliedMods = new Dictionary<string, List<AppliedModSetting>>(),
                     ActiveProfileIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
@@ -1499,12 +1374,11 @@ namespace AMO_Launcher.Services
                     AutoCheckForUpdatesAtStartup = true,
                     EnableDetailedLogging = false,
                     LowUsageMode = false,
-                    RememberLastSelectedGame = false, // Changed default to match new requirement
+                    RememberLastSelectedGame = false,
                     LauncherActionOnGameLaunch = "Minimize",
                     CustomGameScanPaths = new List<string>()
                 };
 
-                // Save the reset settings
                 await SaveSettingsAsync();
 
                 var elapsed = DateTime.Now - startTime;
@@ -1513,7 +1387,6 @@ namespace AMO_Launcher.Services
             }, "ResetToDefaultSettingsAsync");
         }
 
-        // Clear cache directories
         public void ClearCache()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1529,7 +1402,6 @@ namespace AMO_Launcher.Services
                         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                         "AMO_Launcher");
 
-                    // Clear icon cache
                     string iconCachePath = Path.Combine(appDataPath, "IconCache");
                     if (Directory.Exists(iconCachePath))
                     {
@@ -1551,7 +1423,6 @@ namespace AMO_Launcher.Services
                         }
                     }
 
-                    // Clear update files
                     string updatePath = Path.Combine(appDataPath, "Updates");
                     if (Directory.Exists(updatePath))
                     {
@@ -1559,7 +1430,6 @@ namespace AMO_Launcher.Services
 
                         try
                         {
-                            // Count files before deletion for logging
                             int updateFiles = Directory.GetFiles(updatePath, "*", SearchOption.AllDirectories).Length;
 
                             Directory.Delete(updatePath, true);
@@ -1576,7 +1446,6 @@ namespace AMO_Launcher.Services
                         }
                     }
 
-                    // Reset icon cache service
                     App.IconCacheService.ClearCache();
                     App.LogService?.LogDebug("Icon cache service reset");
 
@@ -1588,12 +1457,11 @@ namespace AMO_Launcher.Services
                 {
                     App.LogService?.Error($"Failed to clear cache: {ex.Message}");
                     App.LogService?.LogDebug($"Cache clear error details: {ex}");
-                    throw; // Rethrow for ErrorHandler
+                    throw;
                 }
             }, "ClearCache");
         }
 
-        // Get the default game ID
         public string GetDefaultGameId()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1604,7 +1472,6 @@ namespace AMO_Launcher.Services
             }, "GetDefaultGameId", false, null);
         }
 
-        // Get the last selected game ID
         public string GetLastSelectedGameId()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -1615,18 +1482,14 @@ namespace AMO_Launcher.Services
             }, "GetLastSelectedGameId", false, null);
         }
 
-        // Helper method to check if settings have pending changes
         public bool HasPendingChanges()
         {
             return ErrorHandler.ExecuteSafe(() =>
             {
-                // This is a simple implementation that always returns false
-                // A real implementation would track changes to know if there are pending saves
                 return false;
             }, "HasPendingChanges", false, false);
         }
 
-        // Synchronous save method for shutdown scenarios
         public void SaveSettingsSync()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -1638,10 +1501,8 @@ namespace AMO_Launcher.Services
                     WriteIndented = true
                 });
 
-                // Create a backup before saving
                 BackupSettingsFile();
 
-                // Write directly to file
                 File.WriteAllText(_configFilePath, json);
 
                 App.LogService?.Info("Settings saved synchronously");
@@ -1649,7 +1510,6 @@ namespace AMO_Launcher.Services
         }
     }
 
-    // Classes for serialization
     public class AppSettings
     {
         public List<GameSetting> Games { get; set; }
@@ -1664,9 +1524,9 @@ namespace AMO_Launcher.Services
         public bool AutoCheckForUpdatesAtStartup { get; set; } = true;
         public bool EnableDetailedLogging { get; set; } = false;
         public bool LowUsageMode { get; set; } = false;
-        public bool RememberLastSelectedGame { get; set; } = false; // Changed from true to false
+        public bool RememberLastSelectedGame { get; set; } = false;
         public List<string> CustomGameScanPaths { get; set; } = new List<string>();
-        public string LauncherActionOnGameLaunch { get; set; } = "Minimize"; // Options: None, Minimize, Close
+        public string LauncherActionOnGameLaunch { get; set; } = "Minimize";
     }
 
     public class GameSetting
@@ -1676,6 +1536,6 @@ namespace AMO_Launcher.Services
         public string ExecutablePath { get; set; }
         public string InstallDirectory { get; set; }
         public bool IsDefault { get; set; }
-        public bool IsManuallyAdded { get; set; } // Track manually added games
+        public bool IsManuallyAdded { get; set; }
     }
 }

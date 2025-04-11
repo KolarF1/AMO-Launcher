@@ -14,7 +14,6 @@
         BorderThickness="0">
 
     <Window.Resources>
-        <!-- Window Button Style -->
         <Style x:Key="WindowButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="32"/>
@@ -75,9 +74,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Custom Title Bar -->
         <Grid Grid.Row="0" Background="{DynamicResource AMOGoldGradientHorizontal}" Height="32">
-            <!-- Using MouseDown event with command -->
             <Grid.InputBindings>
                 <MouseBinding MouseAction="LeftClick" Command="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}, Path=DragMoveCommand}"/>
             </Grid.InputBindings>
@@ -88,13 +85,11 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- App Icon and Title -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0,0,0">
                 <TextBlock x:Name="TitleTextBlock" Text="Game Verification Required" VerticalAlignment="Center" 
                            Foreground="Black" FontWeight="Medium" FontSize="16"/>
             </StackPanel>
 
-            <!-- Window Controls -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource CloseButtonStyle}" 
                         Command="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}, Path=CancelCommand}" 
@@ -102,14 +97,12 @@
             </StackPanel>
         </Grid>
 
-        <!-- Main Content -->
         <Grid Grid.Row="1" Background="{StaticResource SecondaryBrush}" Margin="10,0,10,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Game Info -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="20,15,380,5">
                 <Border Width="48" Height="48" Background="{StaticResource PrimaryBrush}" 
                         BorderBrush="#333333" BorderThickness="1" CornerRadius="2">
@@ -124,7 +117,6 @@
                            VerticalAlignment="Center" Margin="15,0,0,0"/>
             </StackPanel>
 
-            <!-- Message Content (moved up slightly) -->
             <StackPanel Grid.Row="1" Margin="20,5,20,0">
 
                 <TextBlock x:Name="MessageTextBlock" 
@@ -148,7 +140,6 @@
 
                 <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Margin="0,5,0,15"/>
 
-                <!-- Removed the bottom two text blocks as requested -->
             </StackPanel>
             <iconPacks:PackIconBootstrapIcons Kind="ExclamationTriangleFill" 
                                                  Width="32" Height="32"
@@ -156,7 +147,6 @@
                                                  Margin="251,25,0,0"/>
         </Grid>
 
-        <!-- Footer with Buttons -->
         <Grid Grid.Row="2" Background="{StaticResource PrimaryBrush}" Height="50">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0">
                 <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource ActionButton}"

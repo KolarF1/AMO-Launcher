@@ -11,13 +11,11 @@ namespace AMO_Launcher.Views
 {
     public partial class BackupProgressWindow : Window
     {
-        // Track operation context for logging
         private string _operationId;
         private string _operationType;
 
         public BackupProgressWindow()
         {
-            // Generate a unique operation ID for tracking this window instance
             _operationId = $"BackupOp_{DateTime.Now:yyyyMMdd_HHmmss}";
 
             ErrorHandler.ExecuteSafe(() =>
@@ -40,7 +38,6 @@ namespace AMO_Launcher.Views
             {
                 App.LogService?.LogDebug($"[{_operationId}] Setting game: {game.Name}");
 
-                // Use Dispatcher to ensure UI updates happen on the UI thread
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
                 {
                     GameNameTextBlock.Text = game.Name;
@@ -60,7 +57,6 @@ namespace AMO_Launcher.Views
             }, $"Set game in backup progress window", true);
         }
 
-        // Set the window title and header based on the operation type
         public void SetOperationType(string operationType)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -68,10 +64,8 @@ namespace AMO_Launcher.Views
                 App.LogService?.Info($"[{_operationId}] Setting operation type: {operationType}");
                 _operationType = operationType;
 
-                // Use Dispatcher to ensure UI updates happen on the UI thread
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
                 {
-                    // Update window title and header text
                     this.Title = operationType;
                     var titleElement = this.FindName("TitleTextBlock") as System.Windows.Controls.TextBlock;
                     if (titleElement != null)
@@ -83,7 +77,6 @@ namespace AMO_Launcher.Views
                         App.LogService?.Warning($"[{_operationId}] TitleTextBlock not found");
                     }
 
-                    // Update the operation text
                     if (OperationTextBlock != null)
                     {
                         OperationTextBlock.Text = $"{operationType} in progress...";
@@ -104,22 +97,18 @@ namespace AMO_Launcher.Views
             {
                 App.LogService?.Trace($"[{_operationId}] Updating progress: {progress:P0}, message: {statusMessage}");
 
-                // Use Dispatcher to ensure UI updates happen on the UI thread
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
                 {
-                    // Update progress bar (0.0 to 1.0)
                     ProgressBar.Value = progress * 100;
 
-                    // Update status message
                     StatusTextBlock.Text = statusMessage;
                 }));
 
-                // Log progress milestones to avoid excessive logging
                 if (progress == 0 || progress == 0.25 || progress == 0.5 || progress == 0.75 || progress == 1.0)
                 {
                     App.LogService?.LogDebug($"[{_operationId}] Progress milestone: {progress:P0}");
                 }
-            }, $"Update progress in backup window", false);  // Don't show errors to user for progress updates
+            }, $"Update progress in backup window", false);
         }
 
         public void SetCompleted()
@@ -128,25 +117,20 @@ namespace AMO_Launcher.Views
             {
                 App.LogService?.Info($"[{_operationId}] Operation completed successfully");
 
-                // Use Dispatcher to ensure UI updates happen on the UI thread
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
                 {
-                    // Update UI to show completion
                     StatusTextBlock.Text = "Operation completed successfully!";
                     ProgressBar.Value = 100;
 
-                    // Change the close button text
                     CloseButton.Content = "Close";
                     CloseButton.IsEnabled = true;
 
-                    // Add completion effect
                     CompletedIcon.Visibility = Visibility.Visible;
                     StatusTextBlock.Foreground = new SolidColorBrush(Colors.LightGreen);
 
                     App.LogService?.LogDebug($"[{_operationId}] UI updated to completed state");
                 }));
 
-                // Log additional operation details if detailed logging is enabled
                 if (App.LogService?.ShouldLogDebug() == true)
                 {
                     App.LogService.LogDebug($"[{_operationId}] Completion details:");
@@ -162,27 +146,21 @@ namespace AMO_Launcher.Views
             {
                 App.LogService?.Error($"[{_operationId}] Operation failed: {errorMessage}");
 
-                // Use Dispatcher to ensure UI updates happen on the UI thread
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
                 {
-                    // Update UI to show error
                     StatusTextBlock.Text = $"Error: {errorMessage}";
 
-                    // Change progress bar color to red
                     ProgressBar.Foreground = new SolidColorBrush(Colors.Red);
 
-                    // Enable close button
                     CloseButton.Content = "Close";
                     CloseButton.IsEnabled = true;
 
-                    // Show error icon
                     ErrorIcon.Visibility = Visibility.Visible;
                     StatusTextBlock.Foreground = new SolidColorBrush(Colors.Red);
 
                     App.LogService?.LogDebug($"[{_operationId}] UI updated to error state");
                 }));
 
-                // Log additional error context if detailed logging is enabled
                 if (App.LogService?.ShouldLogDebug() == true)
                 {
                     App.LogService.LogDebug($"[{_operationId}] Error context:");
@@ -193,7 +171,6 @@ namespace AMO_Launcher.Views
             }, $"Show error in backup window");
         }
 
-        // Command for dragging the window
         public ICommand DragMoveCommand => new RelayCommand(() =>
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -203,7 +180,6 @@ namespace AMO_Launcher.Views
             }, "Window drag operation");
         });
 
-        // Relay command implementation
         public class RelayCommand : ICommand
         {
             private readonly Action _execute;
@@ -224,7 +200,6 @@ namespace AMO_Launcher.Views
             }
         }
 
-        // Command for closing the window
         public ICommand CloseCommand => new RelayCommand(() =>
         {
             ErrorHandler.ExecuteSafe(() =>

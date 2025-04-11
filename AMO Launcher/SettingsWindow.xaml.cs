@@ -26,21 +26,18 @@ namespace AMO_Launcher.Views
 
             ErrorHandler.ExecuteSafe(() =>
             {
-                // Set application version
                 string version = GetAppVersion();
                 VersionTextBlock.Text = $"Current Version: v{version}";
                 AboutVersionTextBlock.Text = $"v{version}";
 
                 App.LogService.LogDebug($"Application version: {version}");
 
-                // Get current game from MainWindow
                 var mainWindow = Application.Current.MainWindow as MainWindow;
                 if (mainWindow != null)
                 {
                     _currentGame = mainWindow.GetCurrentGame();
                     App.LogService.LogDebug($"Current game: {_currentGame?.Name ?? "None"}");
 
-                    // Disable the Reset button if no game is selected
                     if (_currentGame == null)
                     {
                         ResetGameDataButton.IsEnabled = false;
@@ -48,7 +45,6 @@ namespace AMO_Launcher.Views
                         App.LogService.LogDebug("Reset button disabled: No game selected");
                     }
 
-                    // Disable the button for F1 Manager games (they don't need backup)
                     else if (_currentGame.Name != null && _currentGame.Name.Contains("Manager"))
                     {
                         ResetGameDataButton.IsEnabled = false;
@@ -63,12 +59,10 @@ namespace AMO_Launcher.Views
                     App.LogService.LogDebug("Reset button disabled: No MainWindow found");
                 }
 
-                // Load current settings and initialize controls
                 LoadSettings();
             }, "SettingsWindow initialization");
         }
 
-        // Load settings from ConfigurationService
         private void LoadSettings()
         {
             App.LogService.LogDebug("Loading application settings");
@@ -77,17 +71,14 @@ namespace AMO_Launcher.Views
             {
                 var configService = App.ConfigService;
 
-                // Load toggle settings
                 AutoDetectGamesCheckBox.IsChecked = configService.GetAutoDetectGamesAtStartup();
                 AutoCheckUpdatesCheckBox.IsChecked = configService.GetAutoCheckForUpdatesAtStartup();
                 DetailedLoggingCheckBox.IsChecked = configService.GetEnableDetailedLogging();
                 LowUsageModeCheckBox.IsChecked = configService.GetLowUsageMode();
                 RememberLastGameCheckBox.IsChecked = configService.GetRememberLastSelectedGame();
 
-                // Save original values for change detection
                 _originalDetailedLogging = DetailedLoggingCheckBox.IsChecked ?? false;
 
-                // Load launcher action setting
                 string launcherAction = configService.GetLauncherActionOnGameLaunch();
                 _originalLauncherAction = launcherAction;
 
@@ -105,7 +96,6 @@ namespace AMO_Launcher.Views
                         break;
                 }
 
-                // Load custom paths
                 var customPaths = configService.GetCustomGameScanPaths();
                 App.LogService.LogDebug($"Loading {customPaths.Count} custom scan paths");
 
@@ -116,14 +106,12 @@ namespace AMO_Launcher.Views
                     App.LogService.Trace($"Added custom path: {path}");
                 }
 
-                // Reset settings changed flag
                 _settingsChanged = false;
 
                 App.LogService.Info("Settings loaded successfully");
             }, "Loading settings", true);
         }
 
-        // Save settings to ConfigurationService
         private async Task SaveSettingsAsync()
         {
             App.LogService.Info("Saving application settings");
@@ -133,7 +121,6 @@ namespace AMO_Launcher.Views
                 var configService = App.ConfigService;
                 var startTime = DateTime.Now;
 
-                // Log important setting changes for better traceability
                 bool detailedLoggingChanged =
                     _originalDetailedLogging != (DetailedLoggingCheckBox.IsChecked ?? false);
 
@@ -142,21 +129,18 @@ namespace AMO_Launcher.Views
                     App.LogService.Info($"Setting changed: Detailed logging {(DetailedLoggingCheckBox.IsChecked == true ? "enabled" : "disabled")}");
                 }
 
-                // Save toggle settings
                 configService.SetAutoDetectGamesAtStartup(AutoDetectGamesCheckBox.IsChecked ?? true);
                 configService.SetAutoCheckForUpdatesAtStartup(AutoCheckUpdatesCheckBox.IsChecked ?? true);
                 configService.SetEnableDetailedLogging(DetailedLoggingCheckBox.IsChecked ?? false);
                 configService.SetLowUsageMode(LowUsageModeCheckBox.IsChecked ?? false);
                 configService.SetRememberLastSelectedGame(RememberLastGameCheckBox.IsChecked ?? true);
 
-                // Update LogService if detailed logging changed
                 if (detailedLoggingChanged && App.LogService != null)
                 {
                     App.LogService.LogDebug("Updating LogService detailed logging setting");
                     App.LogService.UpdateDetailedLogging(DetailedLoggingCheckBox.IsChecked ?? false);
                 }
 
-                // Save launcher action setting
                 string launcherAction = "Minimize";
                 switch (LauncherActionComboBox.SelectedIndex)
                 {
@@ -178,7 +162,6 @@ namespace AMO_Launcher.Views
 
                 configService.SetLauncherActionOnGameLaunch(launcherAction);
 
-                // Save custom paths
                 App.LogService.LogDebug($"Saving {CustomPathsListBox.Items.Count} custom scan paths");
                 configService.ClearCustomGameScanPaths();
                 foreach (var item in CustomPathsListBox.Items)
@@ -187,14 +170,11 @@ namespace AMO_Launcher.Views
                     App.LogService.Trace($"Added custom path: {item}");
                 }
 
-                // Persist settings to disk
                 App.LogService.LogDebug("Persisting settings to disk");
                 await configService.SaveSettingsAsync();
 
-                // Reset settings changed flag
                 _settingsChanged = false;
 
-                // Log performance
                 var elapsed = DateTime.Now - startTime;
                 App.LogService.LogDebug($"Settings saved in {elapsed.TotalMilliseconds:F1}ms");
 
@@ -202,7 +182,6 @@ namespace AMO_Launcher.Views
             }, "Saving settings", true);
         }
 
-        // Get application version from assembly
         private string GetAppVersion()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -214,7 +193,6 @@ namespace AMO_Launcher.Views
 
         #region Custom Title Bar Handlers
 
-        // Handle window dragging
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -223,7 +201,6 @@ namespace AMO_Launcher.Views
             }, "Window dragging", false);
         }
 
-        // Handle close button click
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.LogDebug("Close button clicked");
@@ -258,7 +235,6 @@ namespace AMO_Launcher.Views
 
         #region UI Event Handlers
 
-        // Save button click handler
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.LogDebug("Save button clicked");
@@ -283,7 +259,6 @@ namespace AMO_Launcher.Views
             }, "Saving settings on user request");
         }
 
-        // Cancel button click handler
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.LogDebug("Cancel button clicked");
@@ -307,7 +282,6 @@ namespace AMO_Launcher.Views
             }, "Canceling settings changes");
         }
 
-        // Reset Game Data button click handler
         private async void ResetGameDataButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.Info("Reset Game Data button clicked");
@@ -322,7 +296,6 @@ namespace AMO_Launcher.Views
                     return;
                 }
 
-                // Check if Original_GameData folder exists
                 string gameInstallDir = _currentGame.InstallDirectory;
                 string backupDir = Path.Combine(gameInstallDir, "Original_GameData");
                 bool backupExists = Directory.Exists(backupDir);
@@ -336,12 +309,10 @@ namespace AMO_Launcher.Views
                         "No Existing Backup", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
 
-                // Show the game verification dialog
                 App.LogService.LogDebug("Opening game verification dialog for reset operation");
                 var dialog = new GameVerificationDialog(_currentGame, true);
                 dialog.Owner = this;
 
-                // Customize dialog text for reset operation
                 dialog.CustomizeForReset();
 
                 bool? result = dialog.ShowDialog();
@@ -350,22 +321,18 @@ namespace AMO_Launcher.Views
                 {
                     App.LogService.Info($"User confirmed reset of game data for {_currentGame.Name}");
 
-                    // User confirmed, perform the reset
                     try
                     {
                         Mouse.OverrideCursor = Cursors.Wait;
 
-                        // Delete existing backup if it exists
                         if (backupExists)
                         {
                             App.LogService.LogDebug($"Deleting existing backup at: {backupDir}");
                             Directory.Delete(backupDir, true);
                         }
 
-                        // Force game version change in GameBackupService to ensure a new backup is created
                         var gameBackupService = App.GameBackupService;
 
-                        // Create a new backup using the existing method
                         App.LogService.Info($"Creating new backup for {_currentGame.Name}");
                         bool backupReady = await gameBackupService.EnsureOriginalGameDataBackupAsync(_currentGame);
 
@@ -401,29 +368,24 @@ namespace AMO_Launcher.Views
             }, "Resetting game data");
         }
 
-        // Check for Updates button click handler
         private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.Info("Check for Updates button clicked");
 
             await ErrorHandler.ExecuteSafeAsync(async () =>
             {
-                // Create a context for this operation
                 var startTime = DateTime.Now;
 
                 try
                 {
                     Mouse.OverrideCursor = Cursors.Wait;
 
-                    // Disable the button to prevent multiple clicks
                     CheckForUpdatesButton.IsEnabled = false;
                     CheckForUpdatesButton.Content = "Checking...";
 
-                    // Call the update service to check for updates
                     App.LogService.LogDebug("Initiating update check");
                     await App.UpdateService.CheckForUpdatesAsync(false);
 
-                    // Log performance
                     var elapsed = DateTime.Now - startTime;
                     App.LogService.LogDebug($"Update check completed in {elapsed.TotalMilliseconds:F1}ms");
                 }
@@ -431,14 +393,12 @@ namespace AMO_Launcher.Views
                 {
                     Mouse.OverrideCursor = null;
 
-                    // Re-enable the button
                     CheckForUpdatesButton.IsEnabled = true;
                     CheckForUpdatesButton.Content = "Check for Updates";
                 }
             }, "Checking for updates", true);
         }
 
-        // Setting checkbox changed handler
         private void SettingCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
         {
             var checkbox = sender as CheckBox;
@@ -450,39 +410,33 @@ namespace AMO_Launcher.Views
             _settingsChanged = true;
         }
 
-        // Launcher action combobox selection changed handler
         private void LauncherActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             App.LogService.Trace($"Setting changed: LauncherAction = {LauncherActionComboBox.SelectedIndex}");
             _settingsChanged = true;
         }
 
-        // Add custom path button click handler
         private void AddPathButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.LogDebug("Add custom path button clicked");
 
             ErrorHandler.ExecuteSafe(() =>
             {
-                // Use a workaround with OpenFileDialog to select a folder
                 var openFileDialog = new OpenFileDialog
                 {
                     Title = "Select a folder to scan for games",
                     CheckFileExists = false,
-                    FileName = "Select Folder", // This is a hint text
-                    Filter = "Folders|*.none" // Not actually used since we're selecting folders
+                    FileName = "Select Folder",
+                    Filter = "Folders|*.none"
                 };
 
-                // Get the result
                 if (openFileDialog.ShowDialog() == true)
                 {
-                    // Get the directory from the selected file path
                     string selectedPath = Path.GetDirectoryName(openFileDialog.FileName);
                     if (!string.IsNullOrEmpty(selectedPath))
                     {
                         App.LogService.LogDebug($"User selected path: {selectedPath}");
 
-                        // Check if path already exists in the list
                         foreach (var item in CustomPathsListBox.Items)
                         {
                             if (item.ToString().Equals(selectedPath, StringComparison.OrdinalIgnoreCase))
@@ -494,7 +448,6 @@ namespace AMO_Launcher.Views
                             }
                         }
 
-                        // Add the path to the list
                         CustomPathsListBox.Items.Add(selectedPath);
                         App.LogService.Info($"Added custom scan path: {selectedPath}");
                         _settingsChanged = true;
@@ -503,7 +456,6 @@ namespace AMO_Launcher.Views
             }, "Adding custom scan path");
         }
 
-        // Remove custom path button click handler
         private void RemovePathButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.LogDebug("Remove custom path button clicked");
@@ -526,7 +478,6 @@ namespace AMO_Launcher.Views
             }, "Removing custom scan path");
         }
 
-        // Clear cache button click handler
         private void ClearCacheButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.Info("Clear cache button clicked");
@@ -560,7 +511,7 @@ namespace AMO_Launcher.Views
                     catch (Exception ex)
                     {
                         Mouse.OverrideCursor = null;
-                        throw; // ErrorHandler will catch this
+                        throw;
                     }
                 }
                 else
@@ -570,7 +521,6 @@ namespace AMO_Launcher.Views
             }, "Clearing application cache", true);
         }
 
-        // Reset settings button click handler
         private async void ResetSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.Info("Reset settings button clicked");
@@ -595,7 +545,6 @@ namespace AMO_Launcher.Views
                         var elapsed = DateTime.Now - startTime;
                         App.LogService.LogDebug($"Settings reset in {elapsed.TotalMilliseconds:F1}ms");
 
-                        // Reload the settings in the UI
                         LoadSettings();
                         Mouse.OverrideCursor = null;
 
@@ -606,7 +555,7 @@ namespace AMO_Launcher.Views
                     catch (Exception ex)
                     {
                         Mouse.OverrideCursor = null;
-                        throw; // ErrorHandler will catch this
+                        throw;
                     }
                 }
                 else
@@ -616,7 +565,6 @@ namespace AMO_Launcher.Views
             }, "Resetting application settings", true);
         }
 
-        // Open settings folder button click handler
         private void OpenSettingsFolderButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.LogDebug("Open settings folder button clicked");
@@ -643,7 +591,6 @@ namespace AMO_Launcher.Views
             }, "Opening settings folder", true);
         }
 
-        // Discord button click handler
         private void DiscordButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.LogDebug("Discord button clicked");
@@ -661,7 +608,6 @@ namespace AMO_Launcher.Views
             }, "Opening Discord link", true);
         }
 
-        // Help button click handler
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
             App.LogService.LogDebug("Help button clicked");

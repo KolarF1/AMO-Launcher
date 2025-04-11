@@ -351,7 +351,6 @@
             <RowDefinition Height="50"/>
         </Grid.RowDefinitions>
 
-        <!-- Custom Title Bar -->
         <Grid Grid.Row="0" Background="{DynamicResource AMOGoldGradientHorizontal}" Height="40" 
               MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid.ColumnDefinitions>
@@ -360,7 +359,6 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- App Icon and Title -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,0,0">
                 <Image Source="pack://application:,,,/Icon.ico" Width="40" Height="40" 
                        VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -371,7 +369,6 @@
             <TextBlock Text="Selected Game: " Foreground="Black" FontSize="12" Grid.Column="1" Margin="130,20,547,4"/>
             <TextBlock x:Name="CurrentGameTextBlock" Text="No game selected" FontSize="12" FontWeight="SemiBold" Grid.Column="1" Margin="214,20,387,4" Foreground="Black"/>
 
-            <!-- Window Controls -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="MinimizeButton" Content="&#xE921;" Style="{StaticResource WindowButtonStyle}" 
                         Click="MinimizeButton_Click" ToolTip="Minimize" Height="40"/>
@@ -382,7 +379,6 @@
             </StackPanel>
         </Grid>
 
-        <!-- Header with Game Selection -->
         <Grid Grid.Row="1" Background="{StaticResource SecondaryBrush}" Margin="0,0,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -391,14 +387,12 @@
             </Grid.ColumnDefinitions>
         </Grid>
 
-        <!-- Main Content -->
         <Grid Grid.Row="2" Margin="10,10,10,-9">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Mod Management Content (dual column layout) -->
             <Border x:Name="GameContentPanel" Grid.Row="0" Grid.RowSpan="2"
                     Background="{StaticResource SecondaryBrush}" BorderBrush="#333333" 
                     BorderThickness="1" Padding="0" Margin="0,0,0,10" Visibility="Visible"
@@ -406,22 +400,17 @@
 
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <!-- Left column - Available Mods -->
                         <ColumnDefinition Width="*"/>
-                        <!-- Column separator -->
                         <ColumnDefinition Width="Auto"/>
-                        <!-- Right column - Applied Mods and Conflicts -->
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left Column - Available Mods -->
                     <Grid Grid.Column="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Left Column Header -->
                         <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Height="30">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -436,7 +425,6 @@
                                           VerticalAlignment="Center" 
                                           FontWeight="Normal"/>
 
-                                <!-- Refresh Mods Button (positioned at right edge) -->
                                 <Button Grid.Column="1"
                                         Style="{StaticResource RefreshModsButtonStyle}" 
                                         Width="26" Height="26" 
@@ -455,18 +443,15 @@
                             </Grid>
                         </Border>
 
-                        <!-- Available Mods Content -->
                         <Border Grid.Row="1" BorderBrush="#333333" BorderThickness="0,1,0,0">
                             <Grid Margin="10">
 
-                                <!-- TreeView that will display available mods -->
                                 <TreeView x:Name="AvailableModsTreeView" 
                                          Background="Transparent" 
                                          BorderThickness="0"
                                          Visibility="Visible"
                                          ContextMenu="{StaticResource ModManagementContextMenu}">
                                     <TreeView.Resources>
-                                        <!-- Template for category headers -->
                                         <HierarchicalDataTemplate DataType="{x:Type models:ModCategory}" 
                                                                  ItemsSource="{Binding Mods}">
                                             <TextBlock Text="{Binding Name}" 
@@ -475,7 +460,6 @@
                                                       Margin="0,5,0,5"/>
                                         </HierarchicalDataTemplate>
 
-                                        <!-- Template for mod items -->
                                         <DataTemplate DataType="{x:Type models:ModInfo}">
                                             <Grid Margin="5,2">
                                                 <Grid.ColumnDefinitions>
@@ -484,7 +468,6 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <!-- Mod Icon -->
                                                 <Border Width="32" Height="32" 
                                                         Background="{StaticResource PrimaryBrush}"
                                                         BorderBrush="#333333" BorderThickness="1" 
@@ -494,7 +477,6 @@
                                                            RenderOptions.EdgeMode="Aliased"/>
                                                 </Border>
 
-                                                <!-- Mod Name and Author -->
                                                 <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                     <TextBlock Text="{Binding Name}" 
                                                                FontWeight="SemiBold" 
@@ -504,7 +486,6 @@
                                                                Foreground="{StaticResource TextSecondaryBrush}"/>
                                                 </StackPanel>
 
-                                                <!-- Version -->
                                                 <TextBlock Grid.Column="2" 
                                                            Text="{Binding Version}" 
                                                            VerticalAlignment="Center"
@@ -513,8 +494,6 @@
                                             </Grid>
                                         </DataTemplate>
 
-                                        <!-- IMPORTANT: Move the TreeViewItemToggleButton template BEFORE the TreeViewItem style that uses it -->
-                                        <!-- Template for the TreeView expander button -->
                                         <ControlTemplate x:Key="TreeViewItemToggleButton" TargetType="{x:Type ToggleButton}">
                                             <Border Width="19" Height="19" Background="Transparent">
                                                 <Path x:Name="ExpandPath" 
@@ -544,7 +523,6 @@
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
 
-                                        <!-- Style for TreeViewItems (both categories and mods) -->
                                         <Style TargetType="{x:Type TreeViewItem}">
                                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                             <Setter Property="Padding" Value="8,0"/>
@@ -558,7 +536,6 @@
                                                                 <RowDefinition Height="Auto"/>
                                                             </Grid.RowDefinitions>
 
-                                                            <!-- Header row with expand/collapse button -->
                                                             <Border x:Name="Bd" Grid.Row="0" 
                                                                    Background="{TemplateBinding Background}"
                                                                    BorderBrush="{TemplateBinding BorderBrush}"
@@ -570,13 +547,11 @@
                                                                         <ColumnDefinition Width="*"/>
                                                                     </Grid.ColumnDefinitions>
 
-                                                                    <!-- ExpanderButton -->
                                                                     <ToggleButton x:Name="Expander" 
                                                                                   IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" 
                                                                                   ClickMode="Press"
                                                                                   Template="{StaticResource TreeViewItemToggleButton}"/>
 
-                                                                    <!-- Header content -->
                                                                     <ContentPresenter x:Name="PART_Header" 
                                                                                      Grid.Column="1"
                                                                                      ContentSource="Header"
@@ -585,11 +560,9 @@
                                                                 </Grid>
                                                             </Border>
 
-                                                            <!-- ItemsPresenter (child items container) -->
                                                             <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Margin="20,0,0,0"/>
                                                         </Grid>
 
-                                                        <!-- Visual states and triggers -->
                                                         <ControlTemplate.Triggers>
                                                             <Trigger Property="IsExpanded" Value="False">
                                                                 <Setter Property="Visibility" Value="Collapsed" TargetName="ItemsHost"/>
@@ -597,7 +570,6 @@
                                                             <Trigger Property="HasItems" Value="False">
                                                                 <Setter Property="Visibility" Value="Hidden" TargetName="Expander"/>
                                                             </Trigger>
-                                                            <!-- Keep the original selected item visual indicator -->
                                                             <Trigger Property="IsSelected" Value="True">
                                                                 <Setter Property="Background" Value="#33FD9A69" TargetName="Bd"/>
                                                             </Trigger>
@@ -615,41 +587,31 @@
                         </Border>
                     </Grid>
 
-                    <!-- Column Separator -->
                     <GridSplitter Grid.Column="1" 
                                  Width="5" 
                                  HorizontalAlignment="Center" 
                                  VerticalAlignment="Stretch" 
                                  Background="#333333"/>
 
-                    <!-- Right Column - Applied Mods & Conflicts -->
                     <Grid Grid.Column="2">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <!-- For tab headers and buttons -->
                             <RowDefinition Height="*"/>
-                            <!-- For tab content -->
                         </Grid.RowDefinitions>
 
-                        <!-- Header row containing both tabs and buttons -->
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
-                                <!-- For tabs -->
                                 <ColumnDefinition Width="*"/>
-                                <!-- Spacer -->
                                 <ColumnDefinition Width="Auto"/>
-                                <!-- For buttons -->
                             </Grid.ColumnDefinitions>
 
-                            <!-- Tab Headers Only -->
                             <TabControl x:Name="ModTabControl" Grid.Row="0" Grid.RowSpan="2" 
                                        Background="Transparent" 
                                        BorderThickness="0" Padding="-2,2,-8,2"
                                        Grid.ColumnSpan="3"
                                        SelectionChanged="TabControl_SelectionChanged">
                                 <TabControl.Resources>
-                                    <!-- Style for the tab items -->
                                     <Style TargetType="TabItem">
                                         <Setter Property="Template">
                                             <Setter.Value>
@@ -674,7 +636,6 @@
                                     </Style>
                                 </TabControl.Resources>
 
-                                <!-- Applied Mods Tab -->
                                 <TabItem x:Name="AppliedModsTab" IsSelected="True">
                                     <TabItem.Header>
                                         <TextBlock Text="Applied Mods" 
@@ -685,9 +646,7 @@
                                             <Grid Margin="10">
                                                 <Grid.RowDefinitions>
                                                     <RowDefinition Height="Auto"/>
-                                                    <!-- For label -->
                                                     <RowDefinition Height="*"/>
-                                                    <!-- For Applied Mods TreeView -->
                                                 </Grid.RowDefinitions>
 
                                                 <TextBlock Grid.Row="0" Text="Mods at bottom have highest priority." 
@@ -695,7 +654,6 @@
                                                           FontStyle="Italic"
                                                           Margin="0,-13,306,5" FontSize="10.5" HorizontalAlignment="Left"/>
 
-                                                <!-- Applied Mods TreeView with direct vertical scrolling -->
                                                 <TreeView x:Name="AppliedModsTreeView" 
                                                          Background="Transparent" 
                                                          BorderThickness="0"
@@ -704,7 +662,6 @@
                                                          MouseDoubleClick="AppliedModsTreeView_MouseDoubleClick"
                                                          ContextMenu="{StaticResource ModManagementContextMenu}">
                                                     <TreeView.Resources>
-                                                        <!-- Template for category headers -->
                                                         <HierarchicalDataTemplate DataType="{x:Type models:ModCategory}" 
                                  ItemsSource="{Binding Mods}">
                                                             <TextBlock Text="{Binding Name}" 
@@ -713,20 +670,14 @@
                       Margin="0,5,0,5"/>
                                                         </HierarchicalDataTemplate>
 
-                                                        <!-- Template for mod items - MODIFIED to fix priority number position -->
                                                         <DataTemplate DataType="{x:Type models:ModInfo}">
-                                                            <!-- Main Grid with fixed column widths -->
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
-                                                                    <!-- Fixed width for checkbox -->
                                                                     <ColumnDefinition Width="Auto"/>
-                                                                    <!-- Most space for mod info - will expand as needed -->
                                                                     <ColumnDefinition Width="*"/>
-                                                                    <!-- Fixed width for priority number with right alignment -->
                                                                     <ColumnDefinition Width="Auto"/>
                                                                 </Grid.ColumnDefinitions>
 
-                                                                <!-- Checkbox -->
                                                                 <CheckBox Grid.Column="0" 
                          IsChecked="{Binding IsActive, Mode=TwoWay}" 
                          VerticalAlignment="Center"
@@ -735,14 +686,12 @@
                          Checked="ActiveCheckBox_CheckChanged"
                          Unchecked="ActiveCheckBox_CheckChanged"/>
 
-                                                                <!-- Mod Icon and Info -->
                                                                 <Grid Grid.Column="1">
                                                                     <Grid.ColumnDefinitions>
                                                                         <ColumnDefinition Width="Auto"/>
                                                                         <ColumnDefinition Width="*"/>
                                                                     </Grid.ColumnDefinitions>
 
-                                                                    <!-- Mod Icon -->
                                                                     <Border Width="32" Height="32" 
                            Background="{StaticResource PrimaryBrush}"
                            BorderBrush="#333333" BorderThickness="1" 
@@ -752,7 +701,6 @@
                                RenderOptions.EdgeMode="Aliased"/>
                                                                     </Border>
 
-                                                                    <!-- Mod Name and Author -->
                                                                     <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                                         <TextBlock Text="{Binding Name}" 
                                   FontWeight="SemiBold" 
@@ -765,7 +713,6 @@
                                                                     </StackPanel>
                                                                 </Grid>
 
-                                                                <!-- Priority Number - fixed width and right-aligned -->
                                                                 <Border Grid.Column="2" 
                        Background="{StaticResource AMOGoldGradient}" 
                        Width="24" Height="24" 
@@ -783,7 +730,6 @@
                                                             </Grid>
                                                         </DataTemplate>
 
-                                                        <!-- TreeViewItem Toggle Button Template -->
                                                         <ControlTemplate x:Key="TreeViewItemToggleButton" TargetType="{x:Type ToggleButton}">
                                                             <Border Width="19" Height="19" Background="Transparent">
                                                                 <Path x:Name="ExpandPath" 
@@ -813,7 +759,6 @@
                                                             </ControlTemplate.Triggers>
                                                         </ControlTemplate>
 
-                                                        <!-- Style for TreeViewItems -->
                                                         <Style TargetType="{x:Type TreeViewItem}">
                                                             <Setter Property="IsExpanded" Value="True"/>
                                                             <Setter Property="Padding" Value="8,3"/>
@@ -827,7 +772,6 @@
                                                                                 <RowDefinition Height="Auto"/>
                                                                             </Grid.RowDefinitions>
 
-                                                                            <!-- Header row with expand/collapse button -->
                                                                             <Border x:Name="Bd" Grid.Row="0" 
                                    Background="{TemplateBinding Background}"
                                    BorderBrush="{TemplateBinding BorderBrush}"
@@ -839,13 +783,11 @@
                                                                                         <ColumnDefinition Width="*"/>
                                                                                     </Grid.ColumnDefinitions>
 
-                                                                                    <!-- ExpanderButton -->
                                                                                     <ToggleButton x:Name="Expander" 
                                                   IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" 
                                                   ClickMode="Press"
                                                   Template="{StaticResource TreeViewItemToggleButton}"/>
 
-                                                                                    <!-- Header content -->
                                                                                     <ContentPresenter x:Name="PART_Header" 
                                                     Grid.Column="1"
                                                     ContentSource="Header"
@@ -854,11 +796,9 @@
                                                                                 </Grid>
                                                                             </Border>
 
-                                                                            <!-- ItemsPresenter (child items container) -->
                                                                             <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Margin="20,0,0,0"/>
                                                                         </Grid>
 
-                                                                        <!-- Visual states and triggers -->
                                                                         <ControlTemplate.Triggers>
                                                                             <Trigger Property="IsExpanded" Value="False">
                                                                                 <Setter Property="Visibility" Value="Collapsed" TargetName="ItemsHost"/>
@@ -866,7 +806,6 @@
                                                                             <Trigger Property="HasItems" Value="False">
                                                                                 <Setter Property="Visibility" Value="Hidden" TargetName="Expander"/>
                                                                             </Trigger>
-                                                                            <!-- Selection highlight -->
                                                                             <Trigger Property="IsSelected" Value="True">
                                                                                 <Setter Property="Background" Value="#33FD9A69" TargetName="Bd"/>
                                                                             </Trigger>
@@ -885,17 +824,14 @@
                                     </Grid>
                                 </TabItem>
 
-                                <!-- Conflicts Tab -->
                                 <TabItem Height="25.96" x:Name="ConflictsTab">
                                     <TabItem.Header>
-                                        <!-- Keep the original styling exactly as it was -->
                                         <TextBlock Text="Conflicts" 
                                                  Style="{StaticResource TabHeaderTextStyle}" FontWeight="DemiBold"/>
                                     </TabItem.Header>
                                     <Grid>
                                         <Border BorderBrush="#333333" BorderThickness="0,1,0,0">
                                             <Grid Margin="10">
-                                                <!-- ListView for conflicts with proper visibility -->
                                                 <ListView x:Name="ConflictsListView" 
                                                          Background="Transparent" 
                                                          BorderThickness="0"
@@ -903,14 +839,12 @@
                                                          Visibility="Visible">
                                                     <ListView.View>
                                                         <GridView>
-                                                            <!-- Hide column headers -->
                                                             <GridView.ColumnHeaderContainerStyle>
                                                                 <Style TargetType="{x:Type GridViewColumnHeader}">
                                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                                 </Style>
                                                             </GridView.ColumnHeaderContainerStyle>
 
-                                                            <!-- Mod info column -->
                                                             <GridViewColumn Width="200">
                                                                 <GridViewColumn.CellTemplate>
                                                                     <DataTemplate>
@@ -920,7 +854,6 @@
                                                                                 <ColumnDefinition Width="*"/>
                                                                             </Grid.ColumnDefinitions>
 
-                                                                            <!-- Mod Icon -->
                                                                             <Border Width="32" Height="32" 
                                                                                    Background="{StaticResource PrimaryBrush}"
                                                                                    BorderBrush="#333333" BorderThickness="1" 
@@ -930,7 +863,6 @@
                                                                                       RenderOptions.EdgeMode="Aliased"/>
                                                                             </Border>
 
-                                                                            <!-- Mod Name -->
                                                                             <TextBlock Grid.Column="1" Text="{Binding ModName}" 
                                                                                       FontWeight="SemiBold" 
                                                                                       Foreground="{StaticResource TextBrush}"
@@ -941,7 +873,6 @@
                                                                 </GridViewColumn.CellTemplate>
                                                             </GridViewColumn>
 
-                                                            <!-- File Path column -->
                                                             <GridViewColumn Width="300">
                                                                 <GridViewColumn.CellTemplate>
                                                                     <DataTemplate>
@@ -969,7 +900,6 @@
                                             <Grid Margin="10">
                                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                                     <StackPanel>
-                                                        <!-- Mod Image/Logo Banner -->
                                                         <Border Width="Auto" Height="100" 
                                                                Background="{StaticResource PrimaryBrush}" 
                                                                BorderBrush="#333333" BorderThickness="1" 
@@ -984,7 +914,6 @@
                                                             </Grid>
                                                         </Border>
 
-                                                        <!-- Mod Details -->
                                                         <StackPanel Margin="0,0,0,10">
                                                             <TextBlock x:Name="ModNameTextBlock" 
                                                                       Text="{Binding SelectedItem.Name, ElementName=AvailableModsTreeView}" 
@@ -1041,7 +970,6 @@
                                 </TabItem>
                             </TabControl>
 
-                            <!-- Buttons above the tab content but separated from the TabControl -->
                             <StackPanel x:Name="ModActionButtons" 
                                       Grid.Column="2"
                                       Orientation="Horizontal" 
@@ -1125,7 +1053,6 @@
             </Rectangle>
         </Grid>
 
-        <!-- Button Panel -->
         <Border Grid.Row="3" Background="{StaticResource PrimaryBrush}" BorderThickness="1,0,1,1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -1136,7 +1063,6 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Pink: Mod Profile Dropdown with fixed width and long name test item -->
                 <ComboBox x:Name="ProfileComboBox" Grid.Column="0" Style="{StaticResource ProfileDropdownStyle}" 
                          SelectionChanged="ProfileComboBox_SelectionChanged"
                          Height="25.96" Margin="9,11,0,11" VerticalContentAlignment="Center" Width="128"/>
@@ -1163,7 +1089,6 @@
                     </Button>
                 </StackPanel>
 
-                <!-- Orange: Apply Mods Button -->
                 <Button Grid.Column="2" Style="{StaticResource ApplyModButtonStyle}" 
                        HorizontalAlignment="Left"
                        Margin="232,13,0,11" Padding="11,5,11,5" 
@@ -1177,7 +1102,6 @@
                                                         VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <!-- Red: Launch Game Button -->
                 <Button Grid.Column="4" Style="{StaticResource LaunchGameButtonStyle}" 
                        Margin="4,12,142,11" Padding="6,2,6,4" 
                        HorizontalContentAlignment="Center"
@@ -1206,7 +1130,6 @@
             </Grid>
         </Border>
 
-        <!-- Resize Grip for Custom Resize -->
         <ResizeGrip x:Name="WindowResizeGrip" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
                    Opacity="0.8" Grid.Row="3"/>
     </Grid>

@@ -10,14 +10,8 @@ namespace AMO_Launcher.Services
 {
     public class IconCacheService
     {
-        // Static cache for application lifetime
         private static readonly Dictionary<string, BitmapImage> _iconCache = new Dictionary<string, BitmapImage>();
 
-        /// <summary>
-        /// Get an icon from the cache or extract from the executable
-        /// </summary>
-        /// <param name="executablePath">Path to the executable</param>
-        /// <returns>BitmapImage of the icon or null if extraction fails</returns>
         public BitmapImage GetIcon(string executablePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -36,7 +30,6 @@ namespace AMO_Launcher.Services
                     return null;
                 }
 
-                // Check if the icon is already in the cache
                 lock (_iconCache)
                 {
                     if (_iconCache.ContainsKey(executablePath))
@@ -46,12 +39,10 @@ namespace AMO_Launcher.Services
                     }
                 }
 
-                // Extract the icon with performance tracking
                 var stopwatch = Stopwatch.StartNew();
                 BitmapImage icon = ExtractIconFromExecutable(executablePath);
                 stopwatch.Stop();
 
-                // Log performance metrics for extraction
                 if (stopwatch.ElapsedMilliseconds > 500)
                 {
                     App.LogService.Warning($"Icon extraction took {stopwatch.ElapsedMilliseconds}ms for {Path.GetFileName(executablePath)} (slow)");
@@ -61,7 +52,6 @@ namespace AMO_Launcher.Services
                     App.LogService.LogDebug($"Icon extraction completed in {stopwatch.ElapsedMilliseconds}ms for {Path.GetFileName(executablePath)}");
                 }
 
-                // Cache it if successfully extracted
                 if (icon != null)
                 {
                     lock (_iconCache)
@@ -79,11 +69,6 @@ namespace AMO_Launcher.Services
             }, "Getting icon from cache or executable", true, null);
         }
 
-        /// <summary>
-        /// Add an icon to the cache
-        /// </summary>
-        /// <param name="executablePath">Path to the executable</param>
-        /// <param name="icon">Icon to cache</param>
         public void AddToCache(string executablePath, BitmapImage icon)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -108,11 +93,6 @@ namespace AMO_Launcher.Services
             }, "Adding icon to cache", true);
         }
 
-        /// <summary>
-        /// Check if an icon is in the cache
-        /// </summary>
-        /// <param name="executablePath">Path to the executable</param>
-        /// <returns>True if the icon is cached</returns>
         public bool HasIcon(string executablePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -132,9 +112,6 @@ namespace AMO_Launcher.Services
             }, "Checking if icon is in cache", true, false);
         }
 
-        /// <summary>
-        /// Clear the icon cache
-        /// </summary>
         public void ClearCache()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -148,18 +125,12 @@ namespace AMO_Launcher.Services
             }, "Clearing icon cache", true);
         }
 
-        /// <summary>
-        /// Extract icon from executable file
-        /// </summary>
-        /// <param name="executablePath">Path to the executable</param>
-        /// <returns>BitmapImage of the icon or null if extraction fails</returns>
         private BitmapImage ExtractIconFromExecutable(string executablePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
             {
                 App.LogService.LogDebug($"Extracting icon from executable: {executablePath}");
 
-                // Create a default icon in case extraction fails
                 BitmapImage defaultIcon = null;
                 try
                 {
@@ -168,14 +139,13 @@ namespace AMO_Launcher.Services
                     defaultIcon.BeginInit();
                     defaultIcon.UriSource = new Uri("pack://application:,,,/AMO_Launcher;component/Resources/DefaultGameIcon.png", UriKind.Absolute);
                     defaultIcon.EndInit();
-                    defaultIcon.Freeze(); // Make it thread-safe
+                    defaultIcon.Freeze();
                     App.LogService.LogDebug("Default icon initialized successfully");
                 }
                 catch (Exception ex)
                 {
                     App.LogService.Error($"Failed to load default icon: {ex.Message}");
                     App.LogService.LogDebug($"Default icon error details: {ex}");
-                    // Continue without default icon
                 }
 
                 if (string.IsNullOrEmpty(executablePath) || !File.Exists(executablePath))
@@ -184,13 +154,10 @@ namespace AMO_Launcher.Services
                     return defaultIcon;
                 }
 
-                // Track individual extraction steps
                 App.LogService.Trace($"Starting icon extraction from: {executablePath}");
 
-                // Extract icon directly to byte array to avoid stream disposal issues
                 byte[] iconData = null;
 
-                // Extract the icon with proper error handling for specific issues
                 try
                 {
                     using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(executablePath))
@@ -206,7 +173,6 @@ namespace AMO_Launcher.Services
                         using (var bitmap = icon.ToBitmap())
                         using (var stream = new MemoryStream())
                         {
-                            // Save as PNG (better quality than BMP)
                             App.LogService.Trace($"Saving icon as PNG");
                             bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
                             iconData = stream.ToArray();
@@ -216,21 +182,18 @@ namespace AMO_Launcher.Services
                 }
                 catch (ArgumentException argEx)
                 {
-                    // Common issue with some executables
                     App.LogService.Error($"Invalid argument during icon extraction: {argEx.Message}");
                     App.LogService.LogDebug($"Argument exception details: {argEx}");
                     return defaultIcon;
                 }
                 catch (InvalidOperationException ioEx)
                 {
-                    // Can occur with corrupted or unusual executables
                     App.LogService.Error($"Invalid operation during icon extraction: {ioEx.Message}");
                     App.LogService.LogDebug($"Invalid operation exception details: {ioEx}");
                     return defaultIcon;
                 }
                 catch (Exception ex)
                 {
-                    // General extraction failure
                     App.LogService.Error($"Icon extraction failed: {ex.Message}");
                     App.LogService.LogDebug($"Exception type: {ex.GetType().Name}");
                     App.LogService.LogDebug($"Stack trace: {ex.StackTrace}");
@@ -243,7 +206,6 @@ namespace AMO_Launcher.Services
                     return defaultIcon;
                 }
 
-                // Create bitmap image from byte array
                 try
                 {
                     App.LogService.Trace("Creating BitmapImage from extracted icon data");
@@ -253,7 +215,7 @@ namespace AMO_Launcher.Services
                     bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
                     bitmapImage.StreamSource = new MemoryStream(iconData);
                     bitmapImage.EndInit();
-                    bitmapImage.Freeze(); // Make it thread-safe
+                    bitmapImage.Freeze();
 
                     App.LogService.LogDebug($"Successfully created BitmapImage, dimensions: {bitmapImage.Width}x{bitmapImage.Height}");
                     return bitmapImage;
@@ -267,10 +229,6 @@ namespace AMO_Launcher.Services
             }, $"Extracting icon from {Path.GetFileName(executablePath)}", false, null);
         }
 
-        /// <summary>
-        /// Get the number of icons in the cache
-        /// </summary>
-        /// <returns>Number of cached icons</returns>
         public int GetCacheSize()
         {
             return ErrorHandler.ExecuteSafe(() =>

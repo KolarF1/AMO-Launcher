@@ -14,7 +14,6 @@
         BorderThickness="0">
 
     <Window.Resources>
-        <!-- Window Button Style -->
         <Style x:Key="WindowButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="32"/>
@@ -67,7 +66,6 @@
             </Style.Triggers>
         </Style>
 
-        <!-- Section Header Style -->
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -75,19 +73,16 @@
             <Setter Property="Margin" Value="0,12,0,0"/>
         </Style>
 
-        <!-- Section Description Style -->
         <Style x:Key="SectionDescriptionStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
             <Setter Property="Margin" Value="0,2,0,6"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
 
-        <!-- Toggle Switch Style -->
         <Style x:Key="ToggleSwitchStyle">
             <Setter Property="Control.Margin" Value="0,4,0,4" />
         </Style>
 
-        <!-- Separator Style -->
         <Style x:Key="SettingsSeparator" TargetType="Border">
             <Setter Property="Height" Value="1"/>
             <Setter Property="Background" Value="#333333"/>
@@ -131,7 +126,6 @@
                                   HorizontalAlignment="Center"/>
                                 </Grid>
                             </Border>
-                            <!-- Remove the Foreground property from ContentPresenter -->
                             <ContentPresenter x:Name="contentPresenter" 
                                      ContentTemplate="{TemplateBinding ContentTemplate}" 
                                      Content="{TemplateBinding Content}" 
@@ -186,7 +180,6 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Explicitly set Foreground to ensure text visibility -->
                                     <TextBlock Grid.Column="0"
                                        x:Name="ContentSite" 
                                        Text="{Binding SelectedItem.Content, RelativeSource={RelativeSource TemplatedParent}}"
@@ -197,7 +190,6 @@
                                        TextAlignment="Left"
                                        Foreground="Black"/>
 
-                                    <!-- Dropdown Arrow -->
                                     <iconPacks:PackIconBootstrapIcons Grid.Column="1" 
                                                      Kind="ChevronDown" 
                                                      Width="12" Height="12" 
@@ -205,7 +197,6 @@
                                                      Foreground="Black"
                                                      Margin="8,0,8,0"/>
 
-                                    <!-- Transparent ToggleButton for capturing clicks -->
                                     <ToggleButton Grid.ColumnSpan="2" 
                                  x:Name="ToggleButton"
                                  Focusable="false"
@@ -221,7 +212,6 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Popup for dropdown items -->
                             <Popup x:Name="Popup" 
                   IsOpen="{TemplateBinding IsDropDownOpen}" 
                   Placement="Bottom"
@@ -261,7 +251,6 @@
                 </Setter.Value>
             </Setter>
 
-            <!-- Item Container Style (for ComboBoxItems) -->
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
@@ -315,7 +304,6 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Custom Title Bar -->
         <Grid Grid.Row="0" Background="{DynamicResource AMOGoldGradientHorizontal}" Height="32" 
               MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid.ColumnDefinitions>
@@ -324,20 +312,17 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- App Icon and Title -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0,0,0">
                 <TextBlock Text="Settings" VerticalAlignment="Center" 
                            Foreground="Black" FontWeight="Medium" FontSize="16"/>
             </StackPanel>
 
-            <!-- Window Controls -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource CloseButtonStyle}" 
                         Click="CloseButton_Click" ToolTip="Close"/>
             </StackPanel>
         </Grid>
 
-        <!-- Main Content -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <Grid Background="{StaticResource SecondaryBrush}" Margin="10,0,10,0">
                 <Grid.ColumnDefinitions>
@@ -345,13 +330,10 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Column -->
                 <StackPanel Grid.Column="0" Margin="25,15,15,15">
-                    <!-- General Settings Section -->
                     <TextBlock Text="GENERAL SETTINGS" FontSize="12" FontWeight="Bold" 
            Foreground="{StaticResource AccentBrush}" Margin="0,10,0,15"/>
 
-                    <!-- Auto-detect games toggle with explicit style -->
                     <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                         <CheckBox x:Name="AutoDetectGamesCheckBox" 
               Content="Auto-detect games at startup" 
@@ -366,7 +348,6 @@
            Margin="20,0,0,15"
            FontSize="11"/>
 
-                    <!-- Remember last selected game toggle with explicit style -->
                     <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                         <CheckBox x:Name="RememberLastGameCheckBox" 
               Content="Remember last selected game" 
@@ -381,7 +362,6 @@
            Margin="20,0,0,15"
            FontSize="11"/>
 
-                    <!-- Launcher behavior on game launch with custom style -->
                     <TextBlock Text="When Game Launches:" 
            Foreground="White"
            FontWeight="Medium"
@@ -397,7 +377,6 @@
                         <ComboBoxItem Content="Close Launcher"/>
                     </ComboBox>
 
-                    <!-- Custom game scan paths -->
                     <TextBlock Text="Custom Game Scan Paths" 
            Foreground="{StaticResource TextBrush}"
            FontWeight="Medium"
@@ -428,14 +407,11 @@
                                 Width="80"/>
                     </StackPanel>
 
-                    <!-- Separator -->
                     <Border Style="{StaticResource SettingsSeparator}"/>
 
-                    <!-- Advanced Settings Header -->
                     <TextBlock Text="ADVANCED" FontSize="12" FontWeight="Bold" 
            Foreground="{StaticResource AccentBrush}" Margin="0,15,0,15"/>
 
-                    <!-- Game Data Management -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,0,0,0" Width="300">
                         <TextBlock Text="Game Data Management" 
                FontSize="14" FontWeight="Medium"
@@ -470,7 +446,6 @@
                Margin="0,5,0,20"
                FontSize="11"/>
 
-                        <!-- Cache Management -->
                         <TextBlock Text="Cache Management" 
                FontSize="14" FontWeight="Medium"
                Foreground="{StaticResource TextBrush}"
@@ -506,14 +481,11 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Right Column -->
                 <StackPanel Grid.Column="1" Margin="15,15,25,15">
-                    <!-- Updates section -->
                     <TextBlock Text="UPDATES" FontSize="12" FontWeight="Bold" 
                                Foreground="{StaticResource AccentBrush}" Margin="0,10,0,15"/>
 
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,0,0,0" Width="300">
-                        <!-- Auto check for updates toggle with explicit style -->
                         <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                             <CheckBox x:Name="AutoCheckUpdatesCheckBox" 
               Content="Auto-check for updates at startup" 
@@ -561,7 +533,6 @@
                                    Margin="0,5,0,0"
                                    FontSize="11"/>
 
-                        <!-- Added Version TextBlock -->
                         <TextBlock x:Name="VersionTextBlock" 
                                    Text="Current Version: v1.0.0" 
                                    Foreground="{StaticResource TextSecondaryBrush}"
@@ -569,14 +540,11 @@
                                    Margin="0,8,0,0"/>
                     </StackPanel>
 
-                    <!-- Separator -->
                     <Border Style="{StaticResource SettingsSeparator}"/>
 
-                    <!-- Performance Settings -->
                     <TextBlock Text="PERFORMANCE" FontSize="12" FontWeight="Bold" 
                                Foreground="{StaticResource AccentBrush}" Margin="0,5,0,15"/>
 
-                    <!-- Low Usage Mode toggle with explicit style -->
                     <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                         <CheckBox x:Name="LowUsageModeCheckBox" 
               Content="Low Usage Mode" 
@@ -591,7 +559,6 @@
            Margin="20,0,0,15"
            FontSize="11"/>
 
-                    <!-- Detailed Logging toggle with explicit style -->
                     <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                         <CheckBox x:Name="DetailedLoggingCheckBox" 
               Content="Enable Detailed Logging" 
@@ -606,10 +573,8 @@
            Margin="20,0,0,15"
            FontSize="11"/>
 
-                    <!-- Separator -->
                     <Border Style="{StaticResource SettingsSeparator}"/>
 
-                    <!-- About Section -->
                     <TextBlock Text="ABOUT" FontSize="12" FontWeight="Bold" 
                                Foreground="{StaticResource AccentBrush}" Margin="0,5,0,15"/>
 
@@ -705,7 +670,6 @@
                                Margin="15,0,0,15"
                                FontSize="12"/>
 
-                    <!-- Reset settings button -->
                     <Button x:Name="ResetSettingsButton" 
                             Content="Reset All Settings" 
                             Style="{StaticResource ActionButton}"
@@ -730,7 +694,6 @@
             </Grid>
         </ScrollViewer>
 
-        <!-- Footer with Save/Cancel Buttons -->
         <Grid Grid.Row="2" Background="{StaticResource PrimaryBrush}" Height="46">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0" Height="40" VerticalAlignment="Center">
                 <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource ActionButton}"

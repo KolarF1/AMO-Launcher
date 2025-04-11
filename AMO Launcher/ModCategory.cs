@@ -1,5 +1,4 @@
-﻿// ModCategory.cs
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -13,7 +12,6 @@ namespace AMO_Launcher.Models
         public ObservableCollection<ModInfo> Mods { get; set; } = new ObservableCollection<ModInfo>();
         public bool IsExpanded { get; set; } = true;
 
-        // Constructor
         public ModCategory(string name)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -32,7 +30,6 @@ namespace AMO_Launcher.Models
 
     public static class ModExtensions
     {
-        // Group mods by their categories with enhanced error handling
         public static ObservableCollection<ModCategory> GroupByCategory(this IEnumerable<ModInfo> mods)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -40,7 +37,6 @@ namespace AMO_Launcher.Models
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
                 App.LogService?.Info("Starting to group mods by category");
 
-                // Check for null input
                 if (mods == null)
                 {
                     App.LogService?.Warning("Null mods collection passed to GroupByCategory");
@@ -52,14 +48,12 @@ namespace AMO_Launcher.Models
                 int modCount = 0;
                 int errorCount = 0;
 
-                // First pass: group mods by category
                 foreach (var mod in mods)
                 {
                     modCount++;
 
                     try
                     {
-                        // Handle null mod
                         if (mod == null)
                         {
                             App.LogService?.Warning($"Encountered null mod at position {modCount}");
@@ -82,19 +76,16 @@ namespace AMO_Launcher.Models
                     }
                     catch (Exception ex)
                     {
-                        // Log but continue processing other mods
                         errorCount++;
                         App.LogService?.Error($"Error processing mod {modCount}: {ex.Message}");
                         App.LogService?.LogDebug($"Exception details: {ex}");
                     }
                 }
 
-                // Sort categories alphabetically, but keep "Uncategorized" at the end
                 var sortedCategories = new ObservableCollection<ModCategory>(
                     categories.OrderBy(c => c.Name == "Uncategorized" ? "zzz" : c.Name)
                 );
 
-                // Log performance and results
                 stopwatch.Stop();
                 App.LogService?.Info($"Grouped {modCount} mods into {categories.Count} categories with {errorCount} errors");
 

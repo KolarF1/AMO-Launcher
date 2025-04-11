@@ -2,7 +2,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
-using AMO_Launcher.Utilities; // Added for ErrorHandler
+using AMO_Launcher.Utilities;
 
 namespace AMO_Launcher.Views
 {
@@ -14,14 +14,11 @@ namespace AMO_Launcher.Views
 
         public UpdateAvailableDialog(Version currentVersion, Version newVersion, string releaseNotes)
         {
-            // Store versions for later use in logging
             _currentVersion = currentVersion;
             _newVersion = newVersion;
 
-            // Use ErrorHandler for constructor initialization
             ErrorHandler.ExecuteSafe(() =>
             {
-                // Log dialog creation
                 App.LogService?.Info($"Showing update dialog for new version {newVersion}");
 
                 InitializeComponent();
@@ -50,7 +47,7 @@ namespace AMO_Launcher.Views
             {
                 App.LogService?.Trace("User dragging update dialog window");
                 this.DragMove();
-            }, "Move update dialog window", false); // No need to show errors during drag
+            }, "Move update dialog window", false);
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)

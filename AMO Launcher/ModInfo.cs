@@ -60,7 +60,6 @@ namespace AMO_Launcher.Models
                 {
                     if (_description != value)
                     {
-                        // Only log if description changes substantially to avoid verbose logs
                         if (App.LogService?.ShouldLogDebug() == true)
                         {
                             if (string.IsNullOrEmpty(_description) || string.IsNullOrEmpty(value))
@@ -112,7 +111,6 @@ namespace AMO_Launcher.Models
                         _author = value;
                         OnPropertyChanged();
 
-                        // AuthorDisplay depends on Author, so update it too
                         OnPropertyChanged(nameof(AuthorDisplay));
                     }
                 }, $"Setting Author property for mod {_name}", false);
@@ -164,7 +162,6 @@ namespace AMO_Launcher.Models
                     {
                         if (App.LogService?.ShouldLogDebug() == true)
                         {
-                            // Check if folder exists when setting
                             bool oldPathExists = !string.IsNullOrEmpty(_modFolderPath) && Directory.Exists(_modFolderPath);
                             bool newPathExists = !string.IsNullOrEmpty(value) && Directory.Exists(value);
 
@@ -196,7 +193,6 @@ namespace AMO_Launcher.Models
                     {
                         if (App.LogService?.ShouldLogDebug() == true)
                         {
-                            // Check if path exists when setting
                             bool oldPathExists = !string.IsNullOrEmpty(_modFilesPath) && Directory.Exists(_modFilesPath);
                             bool newPathExists = !string.IsNullOrEmpty(value) && Directory.Exists(value);
 
@@ -243,7 +239,6 @@ namespace AMO_Launcher.Models
                 {
                     if (_isActive != value)
                     {
-                        // This is significant enough to warrant an INFO level log
                         App.LogService?.Info($"Changing active state for mod '{_name}': {_isActive} -> {value}");
                         _isActive = value;
                         OnPropertyChanged();
@@ -267,7 +262,6 @@ namespace AMO_Launcher.Models
                         _priority = value;
                         OnPropertyChanged();
 
-                        // Update priority display as well
                         UpdatePriorityDisplay();
                     }
                 }, $"Setting Priority property for mod {_name}", false);
@@ -328,9 +322,6 @@ namespace AMO_Launcher.Models
         #endregion
 
         #region Methods
-        /// <summary>
-        /// Updates the priority display based on the current priority value
-        /// </summary>
         private void UpdatePriorityDisplay()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -340,9 +331,6 @@ namespace AMO_Launcher.Models
             }, $"Updating priority display for mod {_name}", false);
         }
 
-        /// <summary>
-        /// Creates a deep copy of this ModInfo object
-        /// </summary>
         public ModInfo Clone()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -373,9 +361,6 @@ namespace AMO_Launcher.Models
             }, $"Cloning mod {_name}", true, null);
         }
 
-        /// <summary>
-        /// Try to load icon from a file path
-        /// </summary>
         public bool TryLoadIcon(string iconPath)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -401,7 +386,7 @@ namespace AMO_Launcher.Models
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
                     bitmap.UriSource = new Uri(iconPath, UriKind.Absolute);
                     bitmap.EndInit();
-                    bitmap.Freeze(); // Make it thread-safe
+                    bitmap.Freeze();
 
                     Icon = bitmap;
                     App.LogService?.LogDebug($"Successfully loaded icon for mod '{_name}'");
@@ -416,9 +401,6 @@ namespace AMO_Launcher.Models
             }, $"Loading icon for mod {_name}", false, false);
         }
 
-        /// <summary>
-        /// Validates that the mod has all required fields set properly
-        /// </summary>
         public bool Validate()
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -427,7 +409,6 @@ namespace AMO_Launcher.Models
 
                 List<string> issues = new List<string>();
 
-                // Check required fields
                 if (string.IsNullOrWhiteSpace(Name) || Name == "Unknown Mod")
                 {
                     issues.Add("Missing mod name");
@@ -466,7 +447,6 @@ namespace AMO_Launcher.Models
                     }
                 }
 
-                // Log validation results
                 if (issues.Count > 0)
                 {
                     App.LogService?.Warning($"Validation failed for mod '{_name}' with {issues.Count} issues:");
@@ -497,15 +477,11 @@ namespace AMO_Launcher.Models
         #endregion
     }
 
-    // Represents a conflict between multiple mods for a single file
     public class ModFileConflict
     {
         public string FilePath { get; set; }
         public List<ModInfo> ConflictingMods { get; set; } = new List<ModInfo>();
 
-        /// <summary>
-        /// Logs details about this conflict
-        /// </summary>
         public void LogConflictDetails()
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -520,7 +496,6 @@ namespace AMO_Launcher.Models
                 App.LogService?.Warning($"File conflict detected: {FilePath}");
                 App.LogService?.LogDebug($"Conflicting mods for {FilePath}: {modNames}");
 
-                // Sort mods by priority to determine winner
                 ConflictingMods.Sort((a, b) => b.Priority.CompareTo(a.Priority));
 
                 var winningMod = ConflictingMods[0];
@@ -529,7 +504,6 @@ namespace AMO_Launcher.Models
         }
     }
 
-    // Used for displaying conflicts in the UI
     public class ConflictItem
     {
         public ModInfo Mod { get; set; }
@@ -538,14 +512,10 @@ namespace AMO_Launcher.Models
         public string ModName => Mod?.Name ?? "Unknown Mod";
         public bool IsWinningMod { get; set; }
 
-        // Visual indicator for which mod takes precedence
         public Brush RowBackground => IsWinningMod ?
             new SolidColorBrush(Color.FromArgb(50, 0, 180, 0)) :
             Brushes.Transparent;
 
-        /// <summary>
-        /// Logs information about this conflict item
-        /// </summary>
         public void LogConflictItemInfo()
         {
             ErrorHandler.ExecuteSafe(() =>

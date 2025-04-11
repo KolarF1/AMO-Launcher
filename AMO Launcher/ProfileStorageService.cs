@@ -16,7 +16,6 @@ namespace AMO_Launcher.Services
 
         public ProfileStorageService()
         {
-            // First create the paths directly in the constructor body
             string appDataPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "AMO_Launcher");
@@ -24,19 +23,16 @@ namespace AMO_Launcher.Services
             _profilesDirectoryPath = Path.Combine(appDataPath, "Profiles");
             _activeProfilesDirectoryPath = Path.Combine(appDataPath, "Profiles", "Active");
 
-            // Initialize directories using ErrorHandler
             ErrorHandler.ExecuteSafe(() =>
             {
                 App.LogService?.LogDebug($"Using application data path: {appDataPath}");
 
-                // Create profiles directory
                 if (!Directory.Exists(_profilesDirectoryPath))
                 {
                     App.LogService?.LogDebug($"Creating profiles directory: {_profilesDirectoryPath}");
                     Directory.CreateDirectory(_profilesDirectoryPath);
                 }
 
-                // Create directory for active profile markers
                 if (!Directory.Exists(_activeProfilesDirectoryPath))
                 {
                     App.LogService?.LogDebug($"Creating active profiles directory: {_activeProfilesDirectoryPath}");
@@ -57,34 +53,27 @@ namespace AMO_Launcher.Services
                     return;
                 }
 
-                // Use performance tracking for file operations
                 App.LogService?.LogDebug($"Starting profile save operation");
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
                 {
-                    // Sanitize game ID for filename
                     string safeGameId = SanitizeForFileName(gameId);
 
-                    // Generate filename: gameId_profileId.json
                     string filePath = Path.Combine(_profilesDirectoryPath, $"{safeGameId}_{profile.Id}.json");
 
-                    // Create directory for game profiles if it doesn't exist
                     App.LogService?.LogDebug($"Ensuring directory exists for profile at {filePath}");
                     Directory.CreateDirectory(Path.GetDirectoryName(filePath));
 
-                    // Serialize profile to JSON
                     App.LogService?.LogDebug($"Serializing profile {profile.Name} to JSON");
                     string json = JsonSerializer.Serialize(profile, new JsonSerializerOptions
                     {
                         WriteIndented = true
                     });
 
-                    // Write to file
                     App.LogService?.LogDebug($"Writing profile to file: {filePath}");
                     await File.WriteAllTextAsync(filePath, json);
                     stopwatch.Stop();
                     App.LogService?.Info($"Saved profile {profile.Name} (ID: {profile.Id}) for game {gameId}");
 
-                    // Log performance info
                     long elapsedMs = stopwatch.ElapsedMilliseconds;
                     if (elapsedMs > 500)
                     {
@@ -110,13 +99,10 @@ namespace AMO_Launcher.Services
 
                 App.LogService?.LogDebug($"Loading profile from: {filePath}");
 
-                // Read JSON from file
                 string json = await File.ReadAllTextAsync(filePath);
 
-                // Deserialize JSON to profile
                 var profile = JsonSerializer.Deserialize<ModProfile>(json);
 
-                // Ensure the profile has all required properties
                 if (profile.AppliedMods == null)
                 {
                     App.LogService?.LogDebug("Profile has no AppliedMods, initializing empty list");
@@ -154,18 +140,14 @@ namespace AMO_Launcher.Services
 
                 string safeGameId = SanitizeForFileName(gameId);
 
-                // Use debug flow tracking
                 App.LogService?.LogDebug($"[FLOW:GetProfiles] START");
 
-                // Find all profile files for this game
                 App.LogService?.LogDebug($"[FLOW:GetProfiles] STEP: Searching for profiles");
                 string searchPattern = $"{safeGameId}_*.json";
                 var files = Directory.GetFiles(_profilesDirectoryPath, searchPattern);
 
-                // Log the count of found files
                 App.LogService?.LogDebug($"Found {files.Length} profile files for game {gameId}");
 
-                // Load each profile
                 App.LogService?.LogDebug($"[FLOW:GetProfiles] STEP: Loading profiles");
                 foreach (var file in files)
                 {
@@ -194,13 +176,10 @@ namespace AMO_Launcher.Services
                     return;
                 }
 
-                // Sanitize game ID for filename
                 string safeGameId = SanitizeForFileName(gameId);
 
-                // Create marker file: gameId.active
                 string filePath = Path.Combine(_activeProfilesDirectoryPath, $"{safeGameId}.active");
 
-                // Write the profile ID to the file
                 App.LogService?.LogDebug($"Setting active profile marker at: {filePath}");
                 await File.WriteAllTextAsync(filePath, profileId);
                 App.LogService?.Info($"Set active profile {profileId} for game {gameId}");
@@ -217,10 +196,8 @@ namespace AMO_Launcher.Services
                     return null;
                 }
 
-                // Sanitize game ID for filename
                 string safeGameId = SanitizeForFileName(gameId);
 
-                // Check marker file: gameId.active
                 string filePath = Path.Combine(_activeProfilesDirectoryPath, $"{safeGameId}.active");
 
                 if (!File.Exists(filePath))
@@ -229,7 +206,6 @@ namespace AMO_Launcher.Services
                     return null;
                 }
 
-                // Read the profile ID from the file
                 App.LogService?.LogDebug($"Reading active profile marker from: {filePath}");
                 string profileId = await File.ReadAllTextAsync(filePath);
                 App.LogService?.Info($"Found active profile {profileId} for game {gameId}");
@@ -247,10 +223,8 @@ namespace AMO_Launcher.Services
                     return false;
                 }
 
-                // Sanitize game ID for filename
                 string safeGameId = SanitizeForFileName(gameId);
 
-                // Find the profile file
                 string filePath = Path.Combine(_profilesDirectoryPath, $"{safeGameId}_{profileId}.json");
 
                 if (!File.Exists(filePath))
@@ -259,12 +233,10 @@ namespace AMO_Launcher.Services
                     return false;
                 }
 
-                // Delete the file
                 App.LogService?.LogDebug($"Deleting profile file: {filePath}");
                 File.Delete(filePath);
                 App.LogService?.Info($"Deleted profile {profileId} for game {gameId}");
 
-                // Check if this was the active profile and clean up if needed
                 string activeId = await GetActiveProfileIdAsync(gameId);
                 if (activeId == profileId)
                 {
@@ -287,16 +259,13 @@ namespace AMO_Launcher.Services
             {
                 var gameIds = new HashSet<string>();
 
-                // Start flow tracking with direct log messages
                 App.LogService?.LogDebug("[FLOW:GetGameIds] START");
 
-                // Find all profile files
                 App.LogService?.LogDebug("Scanning for game IDs with profiles");
                 App.LogService?.LogDebug("[FLOW:GetGameIds] STEP: ScanningFiles");
 
                 var files = Directory.GetFiles(_profilesDirectoryPath, "*.json");
 
-                // Extract game IDs from filenames
                 App.LogService?.LogDebug("[FLOW:GetGameIds] STEP: ExtractingIds");
                 foreach (var file in files)
                 {
@@ -327,13 +296,11 @@ namespace AMO_Launcher.Services
                     return;
                 }
 
-                // Create hierarchical logging with context ID
                 string contextId = Guid.NewGuid().ToString().Substring(0, 8);
                 App.LogService?.Info($"[{contextId}] (ProfileMigration) Starting migration of profiles from settings for {gameProfiles.Count} games");
 
                 int migratedCount = 0;
 
-                // Save each profile to a file
                 foreach (var entry in gameProfiles)
                 {
                     string gameId = entry.Key;
@@ -345,19 +312,16 @@ namespace AMO_Launcher.Services
                         continue;
                     }
 
-                    // Check if we already have files for this game
                     string safeGameId = SanitizeForFileName(gameId);
                     string searchPattern = $"{safeGameId}_*.json";
                     var existingFiles = Directory.GetFiles(_profilesDirectoryPath, searchPattern);
 
-                    // If we already have files, skip migration for this game
                     if (existingFiles.Length > 0)
                     {
                         App.LogService?.Info($"[{contextId}] (ProfileMigration) Skipping migration for game {gameId} - files already exist");
                         continue;
                     }
 
-                    // Use hierarchical logging for game migration
                     string gameContextId = Guid.NewGuid().ToString().Substring(0, 8);
                     App.LogService?.LogDebug($"[{gameContextId}] (ProfileMigration > Game_{gameId}) Migrating {profiles.Count} profiles for game {gameId}");
 
@@ -378,7 +342,6 @@ namespace AMO_Launcher.Services
                         App.LogService?.LogDebug($"[{profileContextId}] (ProfileMigration > Game_{gameId} > Profile_{profile.Name}) Profile migrated successfully");
                     }
 
-                    // Set active profile if we have one
                     if (activeProfileIds != null && activeProfileIds.TryGetValue(gameId, out string activeId))
                     {
                         App.LogService?.LogDebug($"[{gameContextId}] (ProfileMigration > Game_{gameId}) Setting active profile {activeId} for game {gameId}");
@@ -402,7 +365,6 @@ namespace AMO_Launcher.Services
                     return "unknown";
                 }
 
-                // Replace invalid characters with underscore
                 char[] invalidChars = Path.GetInvalidFileNameChars();
                 string sanitized = new string(input.Select(c => invalidChars.Contains(c) ? '_' : c).ToArray());
 
@@ -411,29 +373,23 @@ namespace AMO_Launcher.Services
             }, "Sanitizing filename", defaultValue: "unknown");
         }
 
-        // Helper method for categorized error logging
         private void LogCategorizedError(string message, Exception ex, ErrorCategory category)
         {
-            // Category prefix for the error message
             string categoryPrefix = $"[{category}] ";
 
-            // Basic logging
             App.LogService?.Error($"{categoryPrefix}{message}");
 
             if (ex != null)
             {
-                // Log exception details in debug mode
                 App.LogService?.LogDebug($"{categoryPrefix}Exception: {ex.GetType().Name}: {ex.Message}");
                 App.LogService?.LogDebug($"{categoryPrefix}Stack trace: {ex.StackTrace}");
 
-                // Special handling for file system errors
                 if (category == ErrorCategory.FileSystem &&
                    (ex is IOException || ex is UnauthorizedAccessException))
                 {
                     App.LogService?.LogDebug($"{categoryPrefix}File operation failed - check permissions and if file is in use");
                 }
 
-                // Log inner exception if present
                 if (ex.InnerException != null)
                 {
                     App.LogService?.LogDebug($"{categoryPrefix}Inner exception: {ex.InnerException.Message}");

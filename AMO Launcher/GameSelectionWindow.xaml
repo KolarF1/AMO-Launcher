@@ -14,7 +14,6 @@
         BorderThickness="0">
 
     <Window.Resources>
-        <!-- Window Button Style -->
         <Style x:Key="WindowButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="32"/>
@@ -74,7 +73,6 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Custom Title Bar -->
         <Grid Grid.Row="0" Background="{DynamicResource AMOGoldGradientHorizontal}" Height="32" 
               MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid.ColumnDefinitions>
@@ -83,20 +81,17 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- App Icon and Title -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0,0,0">
                 <TextBlock Text="Select Game" VerticalAlignment="Center" 
                            Foreground="Black" FontWeight="Medium" FontSize="16"/>
             </StackPanel>
 
-            <!-- Window Controls -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource CloseButtonStyle}" 
                         Click="CloseButton_Click" ToolTip="Close"/>
             </StackPanel>
         </Grid>
 
-        <!-- Main Content -->
         <Grid Grid.Row="1" Margin="15,0,15,15">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -104,18 +99,15 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Header -->
             <Grid Grid.Row="0" Margin="0,0,0,15">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="577*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Game Icons Tray (optional) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"/>
             </Grid>
 
-            <!-- Game List -->
             <Border Grid.Row="1" BorderThickness="1" BorderBrush="#333333" 
                     Background="{StaticResource SecondaryBrush}">
                 <ListView x:Name="GameListView" Margin="0" BorderThickness="0"
@@ -126,7 +118,6 @@
                           local:GridViewColumnResizeBehavior.Stretch="True"
                           local:GridViewColumnResizeBehavior.StretchColumn="1">
 
-                    <!-- Context Menu for Right-Click Actions -->
                     <ListView.ContextMenu>
                         <ContextMenu Style="{StaticResource ModContextMenuStyle}">
                             <MenuItem Header="Copy Path to Clipboard" 
@@ -140,7 +131,6 @@
                     </ListView.ContextMenu>
 
 
-                    <!-- Custom ItemContainerStyle for ListViewItems -->
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -154,7 +144,6 @@
                                                 BorderThickness="0" 
                                                 CornerRadius="0"
                                                 Padding="{TemplateBinding Padding}">
-                                            <!-- Important: Use GridViewRowPresenter for proper rendering -->
                                             <GridViewRowPresenter />
                                         </Border>
                                         <ControlTemplate.Triggers>
@@ -173,12 +162,10 @@
 
                     <ListView.View>
                         <GridView ColumnHeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
-                            <!-- Game Name with Icon - Fixed minimum width -->
                             <GridViewColumn Header="Game" Width="200">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" MinWidth="60">
-                                            <!-- Game Icon -->
                                             <Border Width="36" Height="36" Background="{StaticResource PrimaryBrush}" 
                                                     CornerRadius="2" BorderBrush="#333333" BorderThickness="1" Margin="2">
                                                 <Image Source="{Binding Icon}" Width="28" Height="28" 
@@ -186,7 +173,6 @@
                                                        RenderOptions.EdgeMode="Aliased"
                                                        UseLayoutRounding="True" />
                                             </Border>
-                                            <!-- Game Name -->
                                             <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Margin="10,0,0,0"
                                                        FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
                                         </StackPanel>
@@ -194,7 +180,6 @@
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
 
-                            <!-- Game Executable Path - Takes remaining space -->
                             <GridViewColumn Header="Game Path" Width="508">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="{x:Type GridViewColumnHeader}" BasedOn="{StaticResource GridViewColumnHeaderStyle}">
@@ -211,7 +196,6 @@
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
 
-                            <!-- Default Game Indicator - Fixed width, right-aligned -->
                             <GridViewColumn Header="Default" Width="60">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="{x:Type GridViewColumnHeader}" BasedOn="{StaticResource GridViewColumnHeaderStyle}">
@@ -270,7 +254,6 @@
                 </ListView>
             </Border>
 
-            <!-- Action Buttons -->
             <Grid Grid.Row="2" Margin="0,15,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -281,7 +264,6 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Action Buttons -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
                     <Button x:Name="ScanGamesButton" Content="Scan" 
                             Style="{StaticResource ActionButton}"
@@ -307,7 +289,6 @@
                             IsEnabled="False"/>
                 </StackPanel>
 
-                <!-- Cancel/Select Buttons -->
                 <Button Grid.Column="4" x:Name="CancelButton" 
                         Content="Cancel" IsCancel="True"
                         Style="{StaticResource ActionButton}"

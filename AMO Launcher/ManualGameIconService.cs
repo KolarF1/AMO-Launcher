@@ -14,17 +14,14 @@ namespace AMO_Launcher.Services
 
         public ManualGameIconService()
         {
-            // Create a dedicated folder for manually added game icons using ErrorHandler
             _iconStoragePath = ErrorHandler.ExecuteSafe(() =>
             {
-                // Create a dedicated folder for manually added game icons
                 string appDataPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "AMO_Launcher");
 
                 string iconStoragePath = Path.Combine(appDataPath, "ManualIcons");
 
-                // Ensure the directory exists
                 if (!Directory.Exists(iconStoragePath))
                 {
                     App.LogService.LogDebug($"Creating manual icons directory: {iconStoragePath}");
@@ -38,14 +35,12 @@ namespace AMO_Launcher.Services
                 "AMO_Launcher\\ManualIcons"));
         }
 
-        // Get an icon for a manually added game
         public BitmapImage GetIconForGame(string executablePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
             {
                 App.LogService.LogDebug($"Getting icon for game: {executablePath}");
 
-                // First check if we have a saved icon
                 string iconPath = GetIconFilePath(executablePath);
                 if (File.Exists(iconPath))
                 {
@@ -53,10 +48,8 @@ namespace AMO_Launcher.Services
                     return LoadIconFromFile(iconPath);
                 }
 
-                // If not, extract it from the executable and save it
                 if (File.Exists(executablePath))
                 {
-                    // Track icon extraction performance
                     App.LogService.LogDebug($"[PERF] Starting: ExtractingIcon for {Path.GetFileName(executablePath)}");
                     var stopwatch = new System.Diagnostics.Stopwatch();
                     stopwatch.Start();
@@ -88,13 +81,11 @@ namespace AMO_Launcher.Services
                     LogCategorizedError($"Executable not found: {executablePath}", null, "FileSystem");
                 }
 
-                // Return null if all fails
                 App.LogService.Warning($"Could not get icon for {executablePath}");
                 return null;
             }, $"Getting icon for {Path.GetFileName(executablePath)}", showErrorToUser: false);
         }
 
-        // Save an icon for a manually added game
         public void SaveIconForGame(string executablePath, BitmapImage icon)
         {
             ErrorHandler.ExecuteSafe(() =>
@@ -111,7 +102,6 @@ namespace AMO_Launcher.Services
                     return;
                 }
 
-                // Save the icon to disk
                 string iconPath = GetIconFilePath(executablePath);
                 App.LogService.LogDebug($"Saving icon for {Path.GetFileName(executablePath)} to {iconPath}");
                 SaveIconToFile(iconPath, icon);
@@ -119,12 +109,10 @@ namespace AMO_Launcher.Services
             }, $"Saving icon for {Path.GetFileName(executablePath)}");
         }
 
-        // Get the file path for an icon
         private string GetIconFilePath(string executablePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
             {
-                // Use a hash of the path to create a unique filename
                 string hash = GeneratePathHash(executablePath);
                 string filePath = Path.Combine(_iconStoragePath, $"{hash}.png");
                 App.LogService.Trace($"Icon file path for {Path.GetFileName(executablePath)}: {filePath}");
@@ -133,7 +121,6 @@ namespace AMO_Launcher.Services
             defaultValue: Path.Combine(_iconStoragePath, "default.png"));
         }
 
-        // Generate a hash for a path
         private string GeneratePathHash(string path)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -150,14 +137,12 @@ namespace AMO_Launcher.Services
             defaultValue: "default");
         }
 
-        // Save an icon to a file
         private void SaveIconToFile(string filePath, BitmapImage icon)
         {
             ErrorHandler.ExecuteSafe(() =>
             {
                 App.LogService.LogDebug($"Saving icon to file: {filePath}");
 
-                // Ensure directory exists
                 string directory = Path.GetDirectoryName(filePath);
                 if (!Directory.Exists(directory))
                 {
@@ -177,7 +162,6 @@ namespace AMO_Launcher.Services
             }, $"Saving icon to {Path.GetFileName(filePath)}", showErrorToUser: false);
         }
 
-        // Load an icon from a file
         private BitmapImage LoadIconFromFile(string filePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -195,14 +179,13 @@ namespace AMO_Launcher.Services
                 icon.CacheOption = BitmapCacheOption.OnLoad;
                 icon.UriSource = new Uri(filePath, UriKind.Absolute);
                 icon.EndInit();
-                icon.Freeze(); // Make it thread-safe
+                icon.Freeze();
 
                 App.LogService.LogDebug($"Icon loaded successfully, dimensions: {icon.Width}x{icon.Height}");
                 return icon;
             }, $"Loading icon from {Path.GetFileName(filePath)}", showErrorToUser: false);
         }
 
-        // Extract icon from executable file
         private BitmapImage ExtractIconFromExecutable(string exePath)
         {
             return ErrorHandler.ExecuteSafe(() =>
@@ -221,7 +204,6 @@ namespace AMO_Launcher.Services
                     return null;
                 }
 
-                // Extract icon directly to byte array to avoid stream disposal issues
                 byte[] iconData;
                 using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath))
                 {
@@ -236,49 +218,41 @@ namespace AMO_Launcher.Services
                     using (var bitmap = icon.ToBitmap())
                     using (var stream = new MemoryStream())
                     {
-                        // Save as PNG (better quality than BMP)
                         bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
                         iconData = stream.ToArray();
                         App.LogService.Trace($"Converted icon to PNG, size: {iconData.Length} bytes");
                     }
                 }
 
-                // Create bitmap image from byte array
                 var bitmapImage = new BitmapImage();
                 bitmapImage.BeginInit();
                 bitmapImage.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
                 bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
                 bitmapImage.StreamSource = new MemoryStream(iconData);
                 bitmapImage.EndInit();
-                bitmapImage.Freeze(); // Make it thread-safe
+                bitmapImage.Freeze();
 
                 App.LogService.LogDebug($"Bitmap image created, dimensions: {bitmapImage.Width}x{bitmapImage.Height}");
                 return bitmapImage;
             }, $"Extracting icon from {Path.GetFileName(exePath)}", showErrorToUser: false);
         }
 
-        // Enhanced error logging with categorization
         private void LogCategorizedError(string message, Exception ex, string category)
         {
-            // Category prefix for error message
             string categoryPrefix = $"[{category}] ";
 
-            // Basic logging
             App.LogService.Error($"{categoryPrefix}{message}");
 
             if (ex != null)
             {
-                // Log exception details in debug mode
                 App.LogService.LogDebug($"{categoryPrefix}Exception: {ex.GetType().Name}: {ex.Message}");
                 App.LogService.LogDebug($"{categoryPrefix}Stack trace: {ex.StackTrace}");
 
-                // Special handling for different categories
                 switch (category)
                 {
                     case "FileSystem":
                         if (ex is IOException || ex is UnauthorizedAccessException)
                         {
-                            // Additional file system error details
                             App.LogService.LogDebug($"{categoryPrefix}File operation failed - check permissions and if file is in use");
                         }
                         break;
@@ -291,7 +265,6 @@ namespace AMO_Launcher.Services
                         break;
                 }
 
-                // Log inner exception if present
                 if (ex.InnerException != null)
                 {
                     App.LogService.LogDebug($"{categoryPrefix}Inner exception: {ex.InnerException.Message}");

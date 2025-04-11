@@ -108,7 +108,6 @@ namespace AMO_Launcher.Views
                         if (listView.IsLoaded)
                         {
                             App.LogService?.LogDebug("ListView already loaded, updating column widths");
-                            // Manually trigger a resize without creating a SizeChangedEventArgs
                             UpdateColumnWidths(listView);
                         }
                         else
@@ -119,7 +118,6 @@ namespace AMO_Launcher.Views
                                 ErrorHandler.ExecuteSafe(() =>
                                 {
                                     App.LogService?.LogDebug("ListView loaded, updating column widths");
-                                    // Manually trigger a resize when loaded
                                     UpdateColumnWidths(listView);
                                 }, "ListView Loaded event handler");
                             };
@@ -156,34 +154,29 @@ namespace AMO_Launcher.Views
                     int stretchColumnIndex = GetStretchColumn(listView);
                     if (stretchColumnIndex < 0)
                     {
-                        stretchColumnIndex = 1; // Default to second column if not set
+                        stretchColumnIndex = 1;
                         App.LogService?.LogDebug($"Using default stretch column index: {stretchColumnIndex}");
                     }
 
                     if (stretchColumnIndex < gridView.Columns.Count)
                     {
-                        // Calculate the width available for the stretch column
                         double totalWidth = listView.ActualWidth - SystemParameters.VerticalScrollBarWidth;
                         double occupiedWidth = 0;
 
                         App.LogService?.LogDebug($"ListView width: {totalWidth:F1}px (minus scrollbar)");
 
-                        // First, ensure minimum widths are respected for all columns
                         for (int i = 0; i < gridView.Columns.Count; i++)
                         {
                             var column = gridView.Columns[i];
 
-                            // Get the minimum width set for this column (if any)
                             double minWidth = GetMinWidth(column);
 
-                            // If this column has a minimum width constraint and current width is less
                             if (minWidth > 0 && column.ActualWidth < minWidth)
                             {
                                 App.LogService?.Trace($"Column {i}: Setting minimum width {minWidth:F1}px (was {column.ActualWidth:F1}px)");
                                 column.Width = minWidth;
                             }
 
-                            // If this is not the stretch column, add its width to occupied space
                             if (i != stretchColumnIndex)
                             {
                                 occupiedWidth += column.ActualWidth;
@@ -195,8 +188,7 @@ namespace AMO_Launcher.Views
                             }
                         }
 
-                        // Set the stretch column width to take up remaining space
-                        double stretchWidth = Math.Max(totalWidth - occupiedWidth, 100); // Ensure minimum width
+                        double stretchWidth = Math.Max(totalWidth - occupiedWidth, 100);
                         App.LogService?.LogDebug($"Setting stretch column {stretchColumnIndex} width to {stretchWidth:F1}px");
                         gridView.Columns[stretchColumnIndex].Width = stretchWidth;
                     }

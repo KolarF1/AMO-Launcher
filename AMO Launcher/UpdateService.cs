@@ -14,12 +14,12 @@ namespace AMO_Launcher.Services
 {
     public enum UpdateErrorCategory
     {
-        Network,         // GitHub API or download issues
-        FileSystem,      // File access or permissions issues
-        Extraction,      // ZIP extraction issues
-        ApplicationExit, // Issues with closing the app for update
-        External,        // Issues with external updater
-        Unknown          // Uncategorized errors
+        Network,
+        FileSystem,
+        Extraction,
+        ApplicationExit,
+        External,
+        Unknown
     }
 
     public class UpdateService
@@ -32,9 +32,8 @@ namespace AMO_Launcher.Services
         private readonly string _updateTempFolder;
         private readonly string _updaterExePath;
 
-        // Added performance thresholds for logging
-        private readonly int _downloadWarningThresholdMs = 30000; // 30 seconds
-        private readonly int _extractWarningThresholdMs = 5000;   // 5 seconds
+        private readonly int _downloadWarningThresholdMs = 30000;
+        private readonly int _extractWarningThresholdMs = 5000;
 
         public bool IsCheckingForUpdates { get; private set; }
         public event EventHandler<UpdateAvailableEventArgs> UpdateAvailable;
@@ -51,7 +50,6 @@ namespace AMO_Launcher.Services
 
             _currentVersion = Assembly.GetExecutingAssembly().GetName().Version;
 
-            // Set up paths for updates
             string appDataPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "AMO_Launcher");
@@ -59,7 +57,6 @@ namespace AMO_Launcher.Services
             _updateTempFolder = Path.Combine(appDataPath, "Updates");
             _updaterExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AMO_Updater.exe");
 
-            // Create update folder if it doesn't exist
             ErrorHandler.ExecuteSafe(() =>
             {
                 if (!Directory.Exists(_updateTempFolder))
@@ -80,7 +77,6 @@ namespace AMO_Launcher.Services
                 return;
             }
 
-            // Use a unique context ID for this update check operation
             string operationId = $"UpdateCheck_{DateTime.Now:yyyyMMdd_HHmmss}";
             App.LogService?.Info($"[{operationId}] Starting update check");
 
@@ -90,13 +86,10 @@ namespace AMO_Launcher.Services
 
                 try
                 {
-                    // Start performance tracking
                     var startTime = DateTime.Now;
 
-                    // Clear any previous update files
                     ClearUpdateFolder();
 
-                    // Get latest release from GitHub
                     App.LogService?.LogDebug($"[{operationId}] Fetching latest release information");
                     var latestRelease = await GetLatestReleaseAsync();
 
@@ -106,7 +99,6 @@ namespace AMO_Launcher.Services
                         return;
                     }
 
-                    // Parse release version (tag name format should be v1.2.3 or similar)
                     string tagName = latestRelease.TagName.TrimStart('v');
                     if (!Version.TryParse(tagName, out Version latestVersion))
                     {
@@ -116,12 +108,10 @@ namespace AMO_Launcher.Services
 
                     App.LogService?.Info($"[{operationId}] Latest version: {latestVersion}, Current version: {_currentVersion}");
 
-                    // Check if update is needed
                     if (latestVersion > _currentVersion)
                     {
                         App.LogService?.Info($"[{operationId}] Update available! New version: {latestVersion}");
 
-                        // Look for the asset that contains our update package
                         string updateAssetUrl = null;
                         foreach (var asset in latestRelease.Assets)
                         {
@@ -139,7 +129,6 @@ namespace AMO_Launcher.Services
                             return;
                         }
 
-                        // Notify listeners about the update
                         OnUpdateAvailable(new UpdateAvailableEventArgs
                         {
                             CurrentVersion = _currentVersion,
@@ -164,7 +153,6 @@ namespace AMO_Launcher.Services
                         }
                     }
 
-                    // Log performance metrics
                     var elapsed = DateTime.Now - startTime;
                     App.LogService?.LogDebug($"[{operationId}] Update check completed in {elapsed.TotalSeconds:F2} seconds");
                 }
@@ -185,12 +173,10 @@ namespace AMO_Launcher.Services
 
                 var startTime = DateTime.Now;
 
-                // Create a unique filename for the downloaded zip
                 string updateZipPath = Path.Combine(_updateTempFolder, $"update_{DateTime.Now:yyyyMMddHHmmss}.zip");
 
                 App.LogService?.LogDebug($"[{downloadId}] Update will be saved to: {updateZipPath}");
 
-                // Download the update package with progress logging
                 using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
                 {
                     response.EnsureSuccessStatusCode();
@@ -210,7 +196,6 @@ namespace AMO_Launcher.Services
                             await fileStream.WriteAsync(buffer, 0, bytesRead);
                             totalBytesRead += bytesRead;
 
-                            // Log progress every ~10%
                             if (totalBytes.HasValue && totalBytesRead % (totalBytes.Value / 10) < 8192)
                             {
                                 double progressPercent = (double)totalBytesRead / totalBytes.Value * 100;
@@ -223,7 +208,6 @@ namespace AMO_Launcher.Services
                 var elapsed = DateTime.Now - startTime;
                 App.LogService?.Info($"[{downloadId}] Update downloaded successfully in {elapsed.TotalSeconds:F1} seconds");
 
-                // Performance warning if download took too long
                 if (elapsed.TotalMilliseconds > _downloadWarningThresholdMs)
                 {
                     App.LogService?.Warning($"[{downloadId}] Download took longer than expected ({elapsed.TotalSeconds:F1} seconds)");
@@ -242,17 +226,14 @@ namespace AMO_Launcher.Services
                 App.LogService?.Info($"[{extractId}] Preparing update from: {updateZipPath}");
                 var startTime = DateTime.Now;
 
-                // Validate input
                 if (!File.Exists(updateZipPath))
                 {
                     LogCategorizedError($"Update zip file not found: {updateZipPath}", null, UpdateErrorCategory.FileSystem);
                     return false;
                 }
 
-                // Extract the zip to the update folder
                 string extractPath = Path.Combine(_updateTempFolder, "ExtractedUpdate");
 
-                // Clear any existing extracted files
                 if (Directory.Exists(extractPath))
                 {
                     App.LogService?.LogDebug($"[{extractId}] Removing existing extracted files");
@@ -262,20 +243,18 @@ namespace AMO_Launcher.Services
                 Directory.CreateDirectory(extractPath);
                 App.LogService?.LogDebug($"[{extractId}] Created extraction directory: {extractPath}");
 
-                // Extract the update package
                 App.LogService?.LogDebug($"[{extractId}] Extracting update package");
                 ZipFile.ExtractToDirectory(updateZipPath, extractPath);
 
                 var elapsed = DateTime.Now - startTime;
                 App.LogService?.Info($"[{extractId}] Update extracted successfully in {elapsed.TotalSeconds:F1} seconds");
 
-                // Performance warning if extraction took too long
                 if (elapsed.TotalMilliseconds > _extractWarningThresholdMs)
                 {
                     App.LogService?.Warning($"[{extractId}] Extraction took longer than expected ({elapsed.TotalSeconds:F1} seconds)");
                 }
 
-                await Task.Delay(1); // Ensure method is truly async
+                await Task.Delay(1);
                 return true;
             }, "Extracting update", true, false);
         }
@@ -288,7 +267,6 @@ namespace AMO_Launcher.Services
             {
                 App.LogService?.Info($"[{applyId}] Applying update from: {extractedUpdatePath}");
 
-                // Validate updater executable exists
                 if (!File.Exists(_updaterExePath))
                 {
                     string errorMessage = $"Updater executable not found at: {_updaterExePath}";
@@ -296,11 +274,9 @@ namespace AMO_Launcher.Services
                     return false;
                 }
 
-                // Get the main application path and process ID
                 string appPath = Assembly.GetExecutingAssembly().Location;
                 int currentProcessId = Process.GetCurrentProcess().Id;
 
-                // Launch the updater with the necessary parameters
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
                     FileName = _updaterExePath,
@@ -329,7 +305,6 @@ namespace AMO_Launcher.Services
                 {
                     App.LogService?.LogDebug($"Clearing update folder: {_updateTempFolder}");
 
-                    // Delete all .zip files in the update folder
                     int deletedCount = 0;
                     foreach (string file in Directory.GetFiles(_updateTempFolder, "*.zip"))
                     {
@@ -361,7 +336,6 @@ namespace AMO_Launcher.Services
                 {
                     HttpResponseMessage response = await _httpClient.GetAsync(apiUrl);
 
-                    // Log HTTP status for debugging network issues
                     App.LogService?.LogDebug($"GitHub API response status: {(int)response.StatusCode} {response.StatusCode}");
 
                     response.EnsureSuccessStatusCode();
@@ -377,7 +351,6 @@ namespace AMO_Launcher.Services
                 }
                 catch (HttpRequestException ex)
                 {
-                    // Special handling for network errors
                     LogCategorizedError($"GitHub API request failed: {ex.Message}", ex, UpdateErrorCategory.Network);
                     return null;
                 }
@@ -396,22 +369,17 @@ namespace AMO_Launcher.Services
             UpdateCheckFailed?.Invoke(this, ex);
         }
 
-        // Helper method for categorized error logging
         private void LogCategorizedError(string message, Exception ex, UpdateErrorCategory category)
         {
-            // Category prefix for error message
             string categoryPrefix = $"[{category}] ";
 
-            // Basic logging
             App.LogService?.Error($"{categoryPrefix}{message}");
 
             if (ex != null)
             {
-                // Log exception details in debug mode
                 App.LogService?.LogDebug($"{categoryPrefix}Exception: {ex.GetType().Name}: {ex.Message}");
                 App.LogService?.LogDebug($"{categoryPrefix}Stack trace: {ex.StackTrace}");
 
-                // Special handling for different categories
                 switch (category)
                 {
                     case UpdateErrorCategory.Network:
@@ -446,7 +414,6 @@ namespace AMO_Launcher.Services
                         break;
                 }
 
-                // Log inner exception if present
                 if (ex.InnerException != null)
                 {
                     App.LogService?.LogDebug($"{categoryPrefix}Inner exception: {ex.InnerException.Message}");
@@ -455,7 +422,6 @@ namespace AMO_Launcher.Services
             }
         }
 
-        // Format file size for logging
         private string FormatFileSize(long bytes)
         {
             string[] sizes = { "B", "KB", "MB", "GB", "TB" };
@@ -471,7 +437,6 @@ namespace AMO_Launcher.Services
             return $"{size:0.##} {sizes[order]}";
         }
 
-        // Helper classes for JSON deserialization
         private class GitHubRelease
         {
             public string Url { get; set; }
