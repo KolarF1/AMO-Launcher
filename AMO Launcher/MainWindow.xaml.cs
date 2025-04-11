@@ -1404,7 +1404,6 @@ namespace AMO_Launcher
             }, "Move mod to bottom");
         }
 
-        // Helper method to select a mod in the TreeView
         private void SelectModInTreeView(ModInfo modToSelect)
         {
             foreach (var category in _appliedModsCategories)
@@ -1433,7 +1432,6 @@ namespace AMO_Launcher
             }
         }
 
-        // Helper method to find a TreeViewItem by its data context
         private TreeViewItem GetTreeViewItem(ItemsControl container, object item)
         {
             if (container == null) return null;
@@ -1446,7 +1444,6 @@ namespace AMO_Launcher
             return null;
         }
 
-        // Helper method to find a TreeViewItem recursively
         private TreeViewItem GetTreeViewItemRecursive(ItemsControl container, object item)
         {
             if (container == null) return null;
@@ -1817,80 +1814,82 @@ namespace AMO_Launcher
             }, "Update mod priorities");
         }
 
-        private void CopyDirectoryContents(string sourceDir, string targetDir, Views.BackupProgressWindow progressWindow = null)
+        private async Task CopyDirectoryContents(string sourceDir, string targetDir, Views.BackupProgressWindow progressWindow = null)
         {
-            ErrorHandler.ExecuteSafe(() => {
-                try
+            if (!Directory.Exists(sourceDir))
+            {
+                throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
+            }
+
+            Directory.CreateDirectory(targetDir);
+
+            // Get all files first to establish total count
+            var allFiles = Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories);
+            int totalFiles = allFiles.Length;
+            int copiedFiles = 0;
+            int logFrequency = Math.Max(1, totalFiles / 100); // Log only 1% of operations
+
+            // Use multiple threads for file copying
+            int maxConcurrentTasks = Math.Min(16, Environment.ProcessorCount * 2);
+            var semaphore = new SemaphoreSlim(maxConcurrentTasks);
+            var copyTasks = new List<Task>();
+
+            foreach (string file in allFiles)
+            {
+                string relativePath = file.Substring(sourceDir.Length + 1);
+                string destFile = Path.Combine(targetDir, relativePath);
+
+                // Ensure directory exists
+                string destDir = Path.GetDirectoryName(destFile);
+                if (!Directory.Exists(destDir))
+                    Directory.CreateDirectory(destDir);
+
+                await semaphore.WaitAsync();
+
+                copyTasks.Add(Task.Run(async () =>
                 {
-                    App.LogService.LogDebug($"Copying directory contents from {sourceDir} to {targetDir}");
-
-                    if (!Directory.Exists(sourceDir))
+                    try
                     {
-                        App.LogService.Error($"Source directory not found: {sourceDir}");
-                        throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
-                    }
-
-                    Directory.CreateDirectory(targetDir);
-
-                    // Count the total number of files for progress tracking
-                    if (progressWindow != null)
-                    {
-                        int totalFiles = Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories).Length;
-                        App.LogService.LogDebug($"Found {totalFiles} files to copy");
-                    }
-
-                    int copiedFiles = 0;
-                    int errorCount = 0;
-
-                    foreach (string file in Directory.GetFiles(sourceDir))
-                    {
-                        try
+                        // Use FileOptions.SequentialScan for better HDD performance
+                        using (var sourceStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read,
+                                                              bufferSize: 4096, FileOptions.SequentialScan))
+                        using (var destStream = new FileStream(destFile, FileMode.Create, FileAccess.Write, FileShare.None,
+                                                            bufferSize: 4096, FileOptions.SequentialScan))
                         {
-                            string fileName = Path.GetFileName(file);
-                            string destFile = Path.Combine(targetDir, fileName);
-
-                            App.LogService.Trace($"Copying file: {fileName}");
-                            File.Copy(file, destFile, true);
-                            copiedFiles++;
-
-                            // Update progress periodically to avoid UI lag
-                            if (progressWindow != null && copiedFiles % 50 == 0)
-                            {
-                                progressWindow.UpdateProgress(-1, $"Copied {copiedFiles} files so far...");
-                            }
+                            await sourceStream.CopyToAsync(destStream);
                         }
-                        catch (Exception ex)
+
+                        int copied = Interlocked.Increment(ref copiedFiles);
+
+                        // Only update UI periodically to reduce overhead
+                        if (copied % logFrequency == 0 && progressWindow != null)
                         {
-                            errorCount++;
-                            App.LogService.Error($"Error copying file {file}: {ex.Message}");
+                            double progress = (double)copied / totalFiles;
+                            progressWindow.UpdateProgress(progress, $"Copied {copied}/{totalFiles} files...");
                         }
                     }
-
-                    foreach (string directory in Directory.GetDirectories(sourceDir))
+                    finally
                     {
-                        try
-                        {
-                            string dirName = Path.GetFileName(directory);
-                            string destDir = Path.Combine(targetDir, dirName);
-
-                            App.LogService.Trace($"Processing subdirectory: {dirName}");
-                            CopyDirectoryContents(directory, destDir, progressWindow);
-                        }
-                        catch (Exception ex)
-                        {
-                            errorCount++;
-                            App.LogService.Error($"Error processing directory {directory}: {ex.Message}");
-                        }
+                        semaphore.Release();
                     }
+                }));
+            }
 
-                    App.LogService.LogDebug($"Directory copy complete - copied {copiedFiles} files with {errorCount} errors");
-                }
-                catch (Exception ex)
-                {
-                    LogCategorizedError("Error copying directory contents", ex, ErrorCategory.FileSystem);
-                    throw new IOException($"Failed to copy directory contents: {ex.Message}", ex);
-                }
-            }, "Copy directory contents", false);
+            // Process directories
+            foreach (string directory in Directory.GetDirectories(sourceDir))
+            {
+                string dirName = Path.GetFileName(directory);
+                string destDir = Path.Combine(targetDir, dirName);
+                // We don't need to recursively copy here since we got all files with SearchOption.AllDirectories
+            }
+
+            // Wait for all copy operations to complete
+            await Task.WhenAll(copyTasks);
+
+            if (progressWindow != null)
+            {
+                progressWindow.UpdateProgress(1.0, $"Completed copying {copiedFiles} files");
+            }
         }
 
         private void ApplyModFromArchive(ModInfo mod, string targetDir)
